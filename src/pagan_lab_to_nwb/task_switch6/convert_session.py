@@ -6,7 +6,6 @@ from typing import Union
 from zoneinfo import ZoneInfo
 
 from neuroconv.utils import dict_deep_update, load_dict_from_file
-from pagan_lab_to_nwb.arc_ecephys import ArcEcephysNWBConverter
 
 
 def session_to_nwb(data_dir_path: Union[str, Path], output_dir_path: Union[str, Path], stub_test: bool = False):
