@@ -16,6 +16,6 @@ Subject:
   description: A rich text description of the subject
   # TODO: replace temporary placeholder values
   age: TBD  # in ISO 8601, such as "P1W2D"
-  sex: TBD  # One of M, F, U, or O
+  sex: U  # One of M, F, U, or O
   date_of_birth: 2014-06-22 00:00:00-04:00  # Example
   genotype: TBD  # e.g. "C57BL/6J"

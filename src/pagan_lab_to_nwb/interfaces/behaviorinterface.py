@@ -20,6 +20,7 @@ from pydantic import validate_call
 from pynwb.file import NWBFile
 
 from neuroconv.basedatainterface import BaseDataInterface
+from neuroconv.tools import get_module
 from neuroconv.utils import DeepDict
 
 
@@ -33,7 +34,7 @@ class BControlBehaviorInterface(BaseDataInterface):
     info = "Interface for behavior data from BControl to an NWB file."
 
     @validate_call
-    def __init__(self, file_path: Path | str, verbose: bool = False):
+    def __init__(self, file_path: Path, verbose: bool = False):
         """
         Data interface for writing BControl behavioral data to an NWB file.
 
@@ -58,11 +59,6 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         # Read the .mat file
         mat_data = read_mat(self.source_data["file_path"])
-
-        # Extract session_start_time
-        # 'TaskSwitch6 - on rig brodyrigws32.princeton.edu : Marino, P131.  Started at 11:41, Ended at 13:19'
-        # extract the datetime from "Started at" from the title and date from "SavingSection_SaveTime"
-        prot_title = mat_data["saved"]["TaskSwitch6_prot_title"]
 
         # Extract relevant data from the mat file
         # This is a placeholder; actual extraction logic will depend on the structure of the BControl data
@@ -98,6 +94,9 @@ class BControlBehaviorInterface(BaseDataInterface):
             protocol_title = [key for key in self.saved.keys() if "prot_title" in key]
             if len(protocol_title) == 1:
                 protocol_title = self.saved[protocol_title[0]]
+                # Extract session_start_time
+                # 'TaskSwitch6 - on rig brodyrigws32.princeton.edu : Marino, P131.  Started at 11:41, Ended at 13:19'
+                # extract the datetime from "Started at" from the title and date from "SavingSection_SaveTime"
                 match = re.search(r"Started at (\d{2}:\d{2})", protocol_title)
                 # lookup file save date and combine with the time from the protocol title
                 if "SavingSection_SaveTime" in self.saved and match:
@@ -111,13 +110,16 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         return metadata
 
-    def create_states(self) -> tuple[StateTypesTable, StatesTable]:
+    def create_states(self, stub_test: bool = False) -> tuple[StateTypesTable, StatesTable]:
         # todo: add metadata for event types and events tables
         state_types = StateTypesTable(description="State Types Table")
         states_table = StatesTable(description="State Table", state_types_table=state_types)
 
         parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
         num_trials = self.saved["ProtocolsSection_n_completed_trials"]
+        if stub_test:
+            num_trials = min(num_trials, 100)
+            parsed_events = parsed_events[:num_trials]
 
         if num_trials == 1:
             parsed_events = [parsed_events]
@@ -135,16 +137,11 @@ class BControlBehaviorInterface(BaseDataInterface):
             states = trial_events["states"]
             state_names = state_types.state_name[:]
             for state_name in state_names:
-                state_type_region = state_types.create_region(
-                    name=state_name,
-                    region=[state_names.index(state_name)],
-                    description=f"The reference for {state_name} in the state types table.",
-                )
                 if state_name == "state_0":
                     state_start_time = trial_events["states"]["state_0"][0][1]  # start time of the trial
                     state_stop_time = trial_events["states"]["state_0"][1][0]  # end time of the trial
                     states_table.add_row(
-                        state_type=state_type_region,
+                        state_type=state_names.index(state_name),
                         start_time=state_start_time,
                         stop_time=state_stop_time,
                         check_ragged=False,
@@ -153,16 +150,20 @@ class BControlBehaviorInterface(BaseDataInterface):
                     # print(f"Skipping state {state_name} with no recorded times.")
                     continue
                 elif len(states[state_name].shape) == 1:
+                    if np.isnan(states[state_name][0]):
+                        continue
                     states_table.add_row(
-                        state_type=state_type_region,
+                        state_type=state_names.index(state_name),
                         start_time=states[state_name][0],
                         stop_time=states[state_name][1],
                         check_ragged=False,
                     )
                 else:
                     for state_time in states[state_name]:
+                        if np.isnan(state_time[0]):
+                            continue
                         states_table.add_row(
-                            state_type=state_type_region,
+                            state_type=state_names.index(state_name),
                             start_time=state_time[0],
                             stop_time=state_time[1],
                             check_ragged=False,
@@ -170,12 +171,17 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         return state_types, states_table
 
-    def create_events(self) -> tuple[EventTypesTable, EventsTable]:
+    def create_events(self, stub_test: bool = False) -> tuple[EventTypesTable, EventsTable]:
         # todo: add metadata for event types and events tables
         event_types = EventTypesTable(description="Event Types Table")
         events_table = EventsTable(description="Events Table", event_types_table=event_types)
 
         parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
+        num_trials = len(parsed_events)
+        if stub_test:
+            stub_trials = min(num_trials, 100)
+            parsed_events = parsed_events[:stub_trials]
+
         for event_name in parsed_events[0]["pokes"]:
             if not isinstance(parsed_events[0]["pokes"][event_name], np.ndarray):
                 continue
@@ -217,11 +223,16 @@ class BControlBehaviorInterface(BaseDataInterface):
                         )
         return event_types, events_table
 
-    def create_actions(self) -> tuple[ActionTypesTable, ActionsTable]:
+    def create_actions(self, stub_test: bool = False) -> tuple[ActionTypesTable, ActionsTable]:
         action_types = ActionTypesTable(description="Action Types Table")
         actions_table = ActionsTable(description="Actions Table", action_types_table=action_types)
 
         parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
+        num_trials = len(parsed_events)
+        if stub_test:
+            stub_trials = min(num_trials, 100)
+            parsed_events = parsed_events[:stub_trials]
+
         for action_name in parsed_events[0]["waves"]:
             if not isinstance(parsed_events[0]["waves"][action_name], np.ndarray):
                 continue
@@ -257,21 +268,65 @@ class BControlBehaviorInterface(BaseDataInterface):
         return action_types, actions_table
 
     def create_task_arguments(self) -> TaskArgumentsTable:
-        pass
 
-    def add_task(self, nwbfile: NWBFile, metadata: dict) -> None:
+        task_arguments = TaskArgumentsTable(description="Task arguments for the task.")
 
-        state_types_table, states_table = self.create_states()
-        action_types_table, actions_table = self.create_actions()
-        event_types_table, events_table = self.create_events()
+        all_columns = list(self.saved.keys())
 
-        # task_arguments_table = self.create_task_arguments()
+        columns_to_skip = [
+            "raw_events",
+            "parsed_events",
+            "current_assembler",
+            "comments",
+            "my_gui",
+            "my_xyfig",
+            "ThisStimulus",
+        ]
+        all_columns = [col for col in all_columns if not any(skip in col for skip in columns_to_skip)]
+        for argument_name in all_columns:
+            argument_value = self.saved[argument_name]
+            # expression = type(argument_value).__name__
+            argument_description = "no description"  # TODO: extract this from .m if available
+            if isinstance(argument_value, int):
+                expression_type = "integer"  # The type of the expression
+                output_type = "numeric"  # The type of the output
+            elif isinstance(argument_value, float):
+                expression_type = "float"
+                output_type = "numeric"
+            elif isinstance(argument_value, str):
+                expression_type = "string"
+                output_type = "text"
+            elif isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
+                continue  # Skip arrays for now, as they are not well defined in the context of task arguments
+                expression_type = "array"
+                output_type = "numeric"
+            else:
+                expression_type = "unknown"
+                output_type = "unknown"
+
+            task_arguments.add_row(
+                argument_name=argument_name,
+                argument_description=argument_description,
+                expression=str(argument_value),
+                expression_type=expression_type,
+                output_type=output_type,
+            )
+
+        return task_arguments
+
+    def add_task(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+
+        state_types_table, states_table = self.create_states(stub_test=stub_test)
+        action_types_table, actions_table = self.create_actions(stub_test=stub_test)
+        event_types_table, events_table = self.create_events(stub_test=stub_test)
+
+        task_arguments_table = self.create_task_arguments()
 
         task = Task(
             event_types=event_types_table,
             state_types=state_types_table,
             action_types=action_types_table,
-            # task_arguments=task_arguments_table,
+            task_arguments=task_arguments_table,
         )
         # Add the task
         nwbfile.add_lab_meta_data(task)
@@ -280,5 +335,8 @@ class BControlBehaviorInterface(BaseDataInterface):
         recording = TaskRecording(events=events_table, states=states_table, actions=actions_table)
         nwbfile.add_acquisition(recording)
 
-    def add_to_nwbfile(self, nwbfile: NWBFile, metadata: dict):
-        self.add_task(nwbfile=nwbfile, metadata=metadata)
+    def add_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+        self.add_task(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+        get_module(
+            nwbfile=nwbfile, name="behavior", description="Behavior module"
+        )  # Ensure the behavior module exists for spyglass compatibility
