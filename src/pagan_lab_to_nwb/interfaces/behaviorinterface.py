@@ -15,6 +15,7 @@ from ndx_structured_behavior import (
     Task,
     TaskArgumentsTable,
     TaskRecording,
+    TrialsTable,
 )
 from pydantic import validate_call
 from pynwb.file import NWBFile
@@ -65,19 +66,17 @@ class BControlBehaviorInterface(BaseDataInterface):
         self.saved = mat_data.get("saved", None)
         self.saved_history = mat_data.get("saved_history", None)
 
-    def get_trial_times(self) -> (list[float], list[float]):
+    def get_trial_times(self, stub_test: bool = False) -> (list[float], list[float]):
         parsed_events = self.saved_history["ProtocolsSection_parsed_events"]  # list of n trials
+        num_trials = len(parsed_events)
+        if stub_test:
+            num_trials = min(num_trials, 100)
+            parsed_events = parsed_events[:num_trials]
 
         trial_start_times = [events["states"]["state_0"][0][1] for events in parsed_events]
         trial_end_times = [events["states"]["state_0"][1][0] for events in parsed_events]
 
         return trial_start_times, trial_end_times
-
-    # def add_trials(self, nwbfile: NWBFile, metadata: dict) -> None:
-    #     """Add trials to the NWB file."""
-    #     # This is a placeholder; actual implementation will depend on the structure of the BControl data
-    #     trials_table = TrialsTable(name="Trials")
-    #     nwbfile.add_acquisition(trials_table)
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
@@ -335,8 +334,49 @@ class BControlBehaviorInterface(BaseDataInterface):
         recording = TaskRecording(events=events_table, states=states_table, actions=actions_table)
         nwbfile.add_acquisition(recording)
 
+    def add_trials(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+        """Add trials to the NWB file."""
+
+        if "task_recording" not in nwbfile.acquisition:
+            self.add_task(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+        task_recording = nwbfile.acquisition["task_recording"]
+
+        states_table = task_recording.states
+        events_table = task_recording.events
+        actions_table = task_recording.actions
+
+        trials_table = TrialsTable(
+            description="Trials Table",  # TODO: extract from metadata
+            states_table=states_table,
+            events_table=events_table,
+            actions_table=actions_table,
+        )
+        trial_start_times, trial_stop_times = self.get_trial_times()
+
+        for start, stop in zip(trial_start_times, trial_stop_times):
+            states_table_df = states_table[:]
+            states_index_mask = (states_table_df["start_time"] >= start) & (states_table_df["stop_time"] <= stop)
+            states_index_ranges = states_table_df[states_index_mask].index
+
+            events_table_df = events_table[:]
+            events_index_mask = (events_table_df["timestamp"] >= start) & (events_table_df["timestamp"] <= stop)
+            events_index_ranges = events_table_df[events_index_mask].index
+
+            actions_table_df = actions_table[:]
+            actions_index_mask = (actions_table_df["timestamp"] >= start) & (actions_table_df["timestamp"] <= stop)
+            actions_index_ranges = actions_table_df[actions_index_mask].index
+            trials_table.add_trial(
+                start_time=start,
+                stop_time=stop,
+                states=states_index_ranges.tolist(),
+                events=events_index_ranges.tolist(),
+                actions=actions_index_ranges.tolist(),
+            )
+
+        nwbfile.trials = trials_table
+
     def add_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
-        self.add_task(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+        self.add_trials(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
         get_module(
             nwbfile=nwbfile, name="behavior", description="Behavior module"
         )  # Ensure the behavior module exists for spyglass compatibility
