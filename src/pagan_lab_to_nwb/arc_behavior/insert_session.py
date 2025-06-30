@@ -84,7 +84,7 @@ def test_states(nwbfile_path: Path):
     state_type = "state_0"
     with NWBHDF5IO(nwbfile_path, "r") as io:
         nwbfile = io.read()
-        states = nwbfile.acquisition["task_recording"].states.to_dataframe().head(20)
+        states = nwbfile.acquisition["task_recording"].states.to_dataframe()
         states["state_name"] = states["state_type"].apply(lambda row: row["state_name"].iloc[0])
         intervals_from_nwb = states[states["state_name"] == state_type][["start_time", "stop_time"]].to_numpy()
     nwb_copy_file_name = get_nwb_copy_filename(nwbfile_path.name)
@@ -96,7 +96,7 @@ def test_states(nwbfile_path: Path):
 
 if __name__ == "__main__":
 
-    nwbfile_path = Path("/Volumes/T9/data/Pagan/raw/test_with_spyglass3.nwb")
+    nwbfile_path = Path("/Volumes/T9/data/Pagan/raw/sub-H7015_ses-250516a.nwb")
     insert_session(nwbfile_path=nwbfile_path)
 
     nwb_copy_file_name = get_nwb_copy_filename(nwbfile_path.name)
