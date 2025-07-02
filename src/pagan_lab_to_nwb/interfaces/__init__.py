@@ -1,1 +1,1 @@
-from .behaviorinterface import BControlBehaviorInterface
+from .bcontroldatainterface import BControlBehaviorInterface
