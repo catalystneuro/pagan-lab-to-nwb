@@ -19,3 +19,19 @@ Subject:
   sex: U  # One of M, F, U, or O
   date_of_birth: 2014-06-22 00:00:00-04:00  # Example
   genotype: TBD  # e.g. "C57BL/6J"
+
+Behavior:
+  StateTypesTable:
+    description: Contains the name of the states in the task.
+  StatesTable:
+    description: Contains the start and stop times of each state in the task.
+  EventTypesTable:
+    description: Contains the name of the events in the task.
+  EventsTable:
+    description: Contains the start and stop times of each active event (e.g. poke) in the task.
+  ActionsTable:
+    description: Contains the name of the actions in the task.
+  ActionTypesTable:
+    description: Contains the start and stop times of each passive event (e.g. stimulus, reward delivery) in the task.
+  TrialsTable:
+      description: Contains the start and stop times of each trial in the task.
