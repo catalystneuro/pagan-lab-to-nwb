@@ -3,6 +3,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
+from warnings import warn
 
 import numpy as np
 from ndx_structured_behavior import (
@@ -18,11 +19,12 @@ from ndx_structured_behavior import (
     TrialsTable,
 )
 from pydantic import validate_call
+from pynwb.device import Device
 from pynwb.file import NWBFile
 
 from neuroconv.basedatainterface import BaseDataInterface
 from neuroconv.tools import get_module
-from neuroconv.utils import DeepDict
+from neuroconv.utils import DeepDict, get_base_schema, get_schema_from_hdmf_class
 
 
 # TODO: implement this interface in NeuroConv
@@ -35,7 +37,7 @@ class BControlBehaviorInterface(BaseDataInterface):
     info = "Interface for behavior data from BControl to an NWB file."
 
     @validate_call
-    def __init__(self, file_path: Path, verbose: bool = False):
+    def __init__(self, file_path: Path, starting_state: str = "state_0", verbose: bool = False):
         """
         Data interface for writing BControl behavioral data to an NWB file.
 
@@ -45,11 +47,14 @@ class BControlBehaviorInterface(BaseDataInterface):
         ----------
         file_path : Path or str
             The path to the BControl data file to be converted.
+        starting_state : str, default: "state_0"
+            The name of the starting state for the trials. This is used to identify the start of each trial.
         verbose : bool, default: False
         """
 
-        self.verbose = verbose
         super().__init__(file_path=file_path)
+        self.verbose = verbose
+        self.starting_state = starting_state
 
     def _read_data(self):
         """Read the BControl data file and return the data."""
@@ -62,21 +67,69 @@ class BControlBehaviorInterface(BaseDataInterface):
         mat_data = read_mat(self.source_data["file_path"])
 
         # Extract relevant data from the mat file
-        # This is a placeholder; actual extraction logic will depend on the structure of the BControl data
-        self.saved = mat_data.get("saved", None)
-        self.saved_history = mat_data.get("saved_history", None)
+        if "saved" not in mat_data and "saved_history" not in mat_data:
+            raise ValueError(
+                f"The provided .mat file does not contain the expected 'saved' or 'saved_history' fields. The keys: {list(mat_data.keys())}."
+            )
+        self.saved = mat_data["saved"]
+        self.saved_history = mat_data["saved_history"]
 
-    def get_trial_times(self, stub_test: bool = False) -> (list[float], list[float]):
-        parsed_events = self.saved_history["ProtocolsSection_parsed_events"]  # list of n trials
+    def _get_parsed_events(self, stub_test: bool = False) -> list[dict]:
+        """Get parsed events from the saved history."""
+        self._read_data()
+        if "ProtocolsSection_parsed_events" not in self.saved_history:
+            raise ValueError(
+                "The saved_history does not contain 'ProtocolsSection_parsed_events'. "
+                "Please ensure the BControl data file is correctly formatted."
+            )
+        parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
+        if not isinstance(parsed_events, list):
+            raise ValueError(
+                f"Expected 'ProtocolsSection_parsed_events' to be a list, but got {type(parsed_events)}. "
+                "Please check the format of the BControl data file."
+            )
         num_trials = len(parsed_events)
         if stub_test:
             num_trials = min(num_trials, 100)
             parsed_events = parsed_events[:num_trials]
+        return parsed_events
 
-        trial_start_times = [events["states"]["state_0"][0][1] for events in parsed_events]
-        trial_end_times = [events["states"]["state_0"][1][0] for events in parsed_events]
+    def get_trial_times(self, stub_test: bool = False) -> (list[float], list[float]):
+        parsed_events = self._get_parsed_events(stub_test=stub_test)
+
+        trial_start_times = [events["states"][self.starting_state][0][1] for events in parsed_events]
+        trial_end_times = [events["states"][self.starting_state][1][0] for events in parsed_events]
 
         return trial_start_times, trial_end_times
+
+    def get_metadata_schema(self) -> dict:
+        metadata_schema = super().get_metadata_schema()
+        metadata_schema["properties"]["Behavior"] = get_base_schema(tag="Behavior")
+        device_schema = get_schema_from_hdmf_class(Device)
+        metadata_schema["properties"]["Behavior"].update(
+            required=[
+                "Device",
+                "StateTypesTable",
+                "StatesTable",
+                "ActionTypesTable",
+                "ActionsTable",
+                "EventTypesTable",
+                "EventsTable",
+                "TrialsTable",
+            ],
+            properties=dict(
+                Device=device_schema,
+                StateTypesTable=dict(type="object", properties=dict(description={"type": "string"})),
+                StatesTable=dict(type="object", properties=dict(description={"type": "string"})),
+                ActionTypesTable=dict(type="object", properties=dict(description={"type": "string"})),
+                ActionsTable=dict(type="object", properties=dict(description={"type": "string"})),
+                EventTypesTable=dict(type="object", properties=dict(description={"type": "string"})),
+                EventsTable=dict(type="object", properties=dict(description={"type": "string"})),
+                TrialsTable=dict(type="object", properties=dict(description={"type": "string"})),
+                TaskArgumentsTable=dict(type="object", properties=dict(description={"type": "string"})),
+            ),
+        )
+        return metadata_schema
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
@@ -85,48 +138,67 @@ class BControlBehaviorInterface(BaseDataInterface):
             name="BControl",
             manufacturer="Example Manufacturer",  # TODO: ask from lab
         )
-        metadata["Behavior"] = dict(Device=default_device_metadata)
+        metadata["Behavior"] = dict(
+            Device=default_device_metadata,
+            StateTypesTable=dict(description="Contains the name of the states in the task."),
+            StatesTable=dict(description="Contains the start and end times of each state in the task."),
+            ActionsTable=dict(description="Contains the onset times of the task output actions."),
+            ActionTypesTable=dict(description="Contains the name of the task output actions."),
+            EventTypesTable=dict(description="Contains the name of the events in the task."),
+            EventsTable=dict(description="Contains the onset times of events in the task."),
+            TrialsTable=dict(description="Contains the start and end times of each trial in the task."),
+            TaskArgumentsTable=dict(description="Contains the task arguments for the task."),
+        )
 
         self._read_data()
         # extract session_start_time from the protocol title
-        if self.saved is not None:
-            protocol_title = [key for key in self.saved.keys() if "prot_title" in key]
-            if len(protocol_title) == 1:
-                protocol_title = self.saved[protocol_title[0]]
-                # Extract session_start_time
-                # 'TaskSwitch6 - on rig brodyrigws32.princeton.edu : Marino, P131.  Started at 11:41, Ended at 13:19'
-                # extract the datetime from "Started at" from the title and date from "SavingSection_SaveTime"
-                match = re.search(r"Started at (\d{2}:\d{2})", protocol_title)
-                # lookup file save date and combine with the time from the protocol title
-                if "SavingSection_SaveTime" in self.saved and match:
-                    save_time = self.saved["SavingSection_SaveTime"]  # '15-Aug-2019 13:19:41'
-                    time_str = match.group(1)
-                    # Extract date part (e.g., '15-Aug-2019') from save_time
-                    date_str = save_time.split()[0]
-                    # Combine date and time
+        protocol_title = [key for key in self.saved.keys() if "prot_title" in key]
+        if len(protocol_title) == 1:
+            protocol_title = self.saved[protocol_title[0]]
+            # Extract session_start_time
+            # 'TaskSwitch6 - on rig brodyrigws32.princeton.edu : Marino, P131.  Started at 11:41, Ended at 13:19'
+            # extract the datetime from "Started at" from the title and date from "SavingSection_SaveTime"
+            match = re.search(r"Started at (\d{2}:\d{2})", protocol_title)
+            # lookup file save date and combine with the time from the protocol title
+            if "SavingSection_SaveTime" in self.saved and match:
+                save_time = self.saved["SavingSection_SaveTime"]  # '15-Aug-2019 13:19:41'
+                time_str = match.group(1)
+                # Extract date part (e.g., '15-Aug-2019') from save_time
+                date_str = save_time.split()[0]
+                # Combine date and time
+                try:
                     session_start_time = datetime.strptime(f"{date_str} {time_str}", "%d-%b-%Y %H:%M")
                     metadata["NWBFile"]["session_start_time"] = session_start_time
+                except ValueError as e:
+                    warn(
+                        f"Failed to parse session start time from protocol title '{protocol_title}' and save time '{save_time}': {e}"
+                    )
 
         return metadata
 
-    def create_states(self, stub_test: bool = False) -> tuple[StateTypesTable, StatesTable]:
-        # todo: add metadata for event types and events tables
-        state_types = StateTypesTable(description="State Types Table")
-        states_table = StatesTable(description="State Table", state_types_table=state_types)
+    def create_states(self, metadata: dict, stub_test: bool = False) -> tuple[StateTypesTable, StatesTable]:
+        """Create states and state types tables from the parsed events.
+         This method extracts state information from the parsed events and creates
+         the corresponding StateTypesTable and StatesTable.
 
-        parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
-        num_trials = self.saved["ProtocolsSection_n_completed_trials"]
-        if stub_test:
-            num_trials = min(num_trials, 100)
-            parsed_events = parsed_events[:num_trials]
+        Parameters
+         ----------
+         metadata : dict
+             Metadata dictionary containing information about the behavior data.
+         stub_test : bool, default: False
+             If True, only a subset of trials will be processed for testing purposes.
+        """
+        state_types = StateTypesTable(description=metadata["Behavior"]["StateTypesTable"]["description"])
+        states_table = StatesTable(
+            description=metadata["Behavior"]["StatesTable"]["description"],
+            state_types_table=state_types,
+        )
 
-        if num_trials == 1:
-            parsed_events = [parsed_events]
-
-        for state_name in parsed_events[0]["states"]:
-            if not isinstance(parsed_events[0]["states"][state_name], np.ndarray):
+        parsed_events = self._get_parsed_events(stub_test=stub_test)
+        first_parsed_events = parsed_events[0]
+        for state_name in first_parsed_events["states"]:
+            if not isinstance(first_parsed_events["states"][state_name], np.ndarray):
                 continue
-
             state_types.add_row(
                 state_name=state_name,
                 check_ragged=False,
@@ -136,9 +208,9 @@ class BControlBehaviorInterface(BaseDataInterface):
             states = trial_events["states"]
             state_names = state_types.state_name[:]
             for state_name in state_names:
-                if state_name == "state_0":
-                    state_start_time = trial_events["states"]["state_0"][0][1]  # start time of the trial
-                    state_stop_time = trial_events["states"]["state_0"][1][0]  # end time of the trial
+                if state_name == self.starting_state:
+                    state_start_time = trial_events["states"][self.starting_state][0][1]  # start time of the trial
+                    state_stop_time = trial_events["states"][self.starting_state][1][0]  # end time of the trial
                     states_table.add_row(
                         state_type=state_names.index(state_name),
                         start_time=state_start_time,
@@ -170,16 +242,14 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         return state_types, states_table
 
-    def create_events(self, stub_test: bool = False) -> tuple[EventTypesTable, EventsTable]:
+    def create_events(self, metadata: dict, stub_test: bool = False) -> tuple[EventTypesTable, EventsTable]:
         # todo: add metadata for event types and events tables
-        event_types = EventTypesTable(description="Event Types Table")
-        events_table = EventsTable(description="Events Table", event_types_table=event_types)
+        event_types = EventTypesTable(description=metadata["Behavior"]["EventTypesTable"]["description"])
+        events_table = EventsTable(
+            description=metadata["Behavior"]["EventsTable"]["description"], event_types_table=event_types
+        )
 
-        parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
-        num_trials = len(parsed_events)
-        if stub_test:
-            stub_trials = min(num_trials, 100)
-            parsed_events = parsed_events[:stub_trials]
+        parsed_events = self._get_parsed_events(stub_test=stub_test)
 
         for event_name in parsed_events[0]["pokes"]:
             if not isinstance(parsed_events[0]["pokes"][event_name], np.ndarray):
@@ -193,12 +263,10 @@ class BControlBehaviorInterface(BaseDataInterface):
             pokes = trial_events["pokes"]
             event_names = event_types.event_name[:]
             for event_name in event_names:
-                # TODO: event type is an integer and not region TypeError: EventsTable.add_row: incorrect type for 'event_type' (got 'DynamicTableRegion', expected 'int'), missing argument 'value'
                 event_type = event_types.event_name[:].index(event_name)
                 if len(pokes[event_name]) == 0:
-                    print(f"Skipping event {event_name} with no recorded times.")
+                    # print(f"Skipping event {event_name} with no recorded times.")
                     continue
-                # todo: skip nan values
                 elif len(pokes[event_name].shape) == 1:
                     if np.isnan(pokes[event_name][0]):
                         continue
@@ -222,15 +290,13 @@ class BControlBehaviorInterface(BaseDataInterface):
                         )
         return event_types, events_table
 
-    def create_actions(self, stub_test: bool = False) -> tuple[ActionTypesTable, ActionsTable]:
-        action_types = ActionTypesTable(description="Action Types Table")
-        actions_table = ActionsTable(description="Actions Table", action_types_table=action_types)
+    def create_actions(self, metadata: dict, stub_test: bool = False) -> tuple[ActionTypesTable, ActionsTable]:
+        action_types = ActionTypesTable(description=metadata["Behavior"]["ActionTypesTable"]["description"])
+        actions_table = ActionsTable(
+            description=metadata["Behavior"]["ActionTypesTable"]["description"], action_types_table=action_types
+        )
 
-        parsed_events = self.saved_history["ProtocolsSection_parsed_events"]
-        num_trials = len(parsed_events)
-        if stub_test:
-            stub_trials = min(num_trials, 100)
-            parsed_events = parsed_events[:stub_trials]
+        parsed_events = self._get_parsed_events(stub_test=stub_test)
 
         for action_name in parsed_events[0]["waves"]:
             if not isinstance(parsed_events[0]["waves"][action_name], np.ndarray):
@@ -245,7 +311,7 @@ class BControlBehaviorInterface(BaseDataInterface):
             action_names = action_types.action_name[:]
             for action_name in action_names:
                 if len(waves[action_name]) == 0:
-                    print(f"Skipping action {action_name} with no recorded times.")
+                    # print(f"Skipping action {action_name} with no recorded times.")
                     continue
                 elif len(waves[action_name].shape) == 1:
                     actions_table.add_row(
@@ -315,9 +381,9 @@ class BControlBehaviorInterface(BaseDataInterface):
 
     def add_task(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
 
-        state_types_table, states_table = self.create_states(stub_test=stub_test)
-        action_types_table, actions_table = self.create_actions(stub_test=stub_test)
-        event_types_table, events_table = self.create_events(stub_test=stub_test)
+        state_types_table, states_table = self.create_states(stub_test=stub_test, metadata=metadata)
+        action_types_table, actions_table = self.create_actions(stub_test=stub_test, metadata=metadata)
+        event_types_table, events_table = self.create_events(stub_test=stub_test, metadata=metadata)
 
         task_arguments_table = self.create_task_arguments()
 
@@ -330,7 +396,7 @@ class BControlBehaviorInterface(BaseDataInterface):
         # Add the task
         nwbfile.add_lab_meta_data(task)
 
-        # To add these tables to acquisitions in an NWBFile, they are stored within TaskRecording.
+        # Add the tables to the task recording
         recording = TaskRecording(events=events_table, states=states_table, actions=actions_table)
         nwbfile.add_acquisition(recording)
 
@@ -346,7 +412,7 @@ class BControlBehaviorInterface(BaseDataInterface):
         actions_table = task_recording.actions
 
         trials_table = TrialsTable(
-            description="Trials Table",  # TODO: extract from metadata
+            description=metadata["Behavior"]["TrialsTable"]["description"],
             states_table=states_table,
             events_table=events_table,
             actions_table=actions_table,
