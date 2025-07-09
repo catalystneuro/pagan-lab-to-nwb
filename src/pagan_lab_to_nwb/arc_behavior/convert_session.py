@@ -13,7 +13,22 @@ def session_to_nwb(
     file_path: FilePath,
     nwbfile_path: FilePath,
     stub_test: bool = False,
+    overwrite: bool = True,
 ):
+    """
+    Convert a session of BControl data to NWB format.
+
+    Parameters
+    ----------
+    file_path : FilePath
+        Path to the BControl behavior data file (e.g., .mat file).
+    nwbfile_path : FilePath
+        Path where the NWB file will be saved.
+    stub_test : bool, optional
+        If True, runs a stub test without full conversion. Default is False.
+    overwrite : bool, optional
+        If True, overwrites the existing NWB file if it exists. Default is True.
+    """
 
     source_data = dict()
     conversion_options = dict()
@@ -45,7 +60,12 @@ def session_to_nwb(
     metadata["NWBFile"]["session_id"] = session_id
 
     # Run conversion
-    converter.run_conversion(metadata=metadata, nwbfile_path=nwbfile_path, conversion_options=conversion_options)
+    converter.run_conversion(
+        metadata=metadata,
+        nwbfile_path=nwbfile_path,
+        conversion_options=conversion_options,
+        overwrite=overwrite,
+    )
 
 
 if __name__ == "__main__":
@@ -54,9 +74,11 @@ if __name__ == "__main__":
     behavior_file_path = '/Users/weian/data/Pagan/Protocol "TaskSwitch6"/data_@TaskSwitch6_Nuria_H7015_250516a.mat'
     nwbfile_path = "/Volumes/T9/data/Pagan/raw/sub-H7015_ses-250516a.nwb"
     stub_test = True
+    overwrite = True
 
     session_to_nwb(
         file_path=behavior_file_path,
         nwbfile_path=nwbfile_path,
         stub_test=stub_test,
+        overwrite=overwrite,
     )
