@@ -6,6 +6,7 @@ from pathlib import Path
 from warnings import warn
 
 import numpy as np
+import pandas as pd
 from ndx_structured_behavior import (
     ActionsTable,
     ActionTypesTable,
@@ -229,50 +230,96 @@ class BControlBehaviorInterface(BaseDataInterface):
         )
 
         parsed_events = self._get_parsed_events(stub_test=stub_test)
-        first_parsed_events = parsed_events[0]
-        for state_name in first_parsed_events["states"]:
-            if not isinstance(first_parsed_events["states"][state_name], np.ndarray):
+        first_trial_states = parsed_events[0]["states"]
+        for state_name in first_trial_states:
+            # Check if the state is a valid state with recorded times
+            if not isinstance(first_trial_states[state_name], np.ndarray):
                 continue
-            state_types.add_row(
-                state_name=state_name,
-                check_ragged=False,
-            )
+            state_types.add_row(state_name=state_name, check_ragged=False)
 
+        state_rows = []
         for trial_events in parsed_events:
             states = trial_events["states"]
             state_names = state_types.state_name[:]
             for state_name in state_names:
-                if state_name == self.starting_state:
-                    state_start_time = trial_events["states"][self.starting_state][0][1]  # start time of the trial
-                    state_stop_time = trial_events["states"][self.starting_state][1][0]  # end time of the trial
-                    states_table.add_row(
-                        state_type=state_names.index(state_name),
-                        start_time=state_start_time,
-                        stop_time=state_stop_time,
-                        check_ragged=False,
-                    )
-                elif len(states[state_name]) == 0:
-                    # print(f"Skipping state {state_name} with no recorded times.")
+                state_times = states[state_name]
+                if len(state_times) == 0:
                     continue
-                elif len(states[state_name].shape) == 1:
-                    if np.isnan(states[state_name][0]):
-                        continue
-                    states_table.add_row(
-                        state_type=state_names.index(state_name),
-                        start_time=states[state_name][0],
-                        stop_time=states[state_name][1],
-                        check_ragged=False,
-                    )
-                else:
-                    for state_time in states[state_name]:
-                        if np.isnan(state_time[0]):
-                            continue
-                        states_table.add_row(
-                            state_type=state_names.index(state_name),
-                            start_time=state_time[0],
-                            stop_time=state_time[1],
-                            check_ragged=False,
+
+                state_times = np.asarray(state_times)
+                # Special handling for starting state with possible NaNs
+                if state_name == self.starting_state:
+                    not_nan = ~np.isnan(state_times)
+                    starting_state_times = state_times[not_nan]
+                    if len(starting_state_times) > 2:
+                        raise ValueError(
+                            f"Unexpected shape for starting state '{state_name}': {state_times.shape}. "
+                            f"Expected shape is (2,) or (2, 2) with NaNs handled."
                         )
+                    start_time, stop_time = starting_state_times
+                    state_rows.append(
+                        {
+                            "state_name": state_name,
+                            "start_time": start_time,
+                            "stop_time": stop_time,
+                        }
+                    )
+                    continue
+
+                # Single interval: shape (2,)
+                if state_times.shape == (2,):
+                    start_time, stop_time = state_times
+                    if not np.isnan(start_time):
+                        state_rows.append(
+                            {
+                                "state_name": state_name,
+                                "start_time": start_time,
+                                "stop_time": stop_time,
+                            }
+                        )
+                    continue
+
+                # Special case: shape (2, 2) and first row contains NaN
+                if state_times.shape == (2, 2) and np.any(np.isnan(state_times[0])):
+                    not_nan = ~np.isnan(state_times)
+                    flat_times = state_times[not_nan]
+                    if len(flat_times) >= 2:
+                        start_time, stop_time = flat_times[:2]
+                        state_rows.append(
+                            {
+                                "state_name": state_name,
+                                "start_time": start_time,
+                                "stop_time": stop_time,
+                            }
+                        )
+                    continue
+
+                # General case: iterate over intervals
+                for state_time in state_times:
+                    if len(state_time) != 2:
+                        raise ValueError(f"Unexpected shape for state '{state_name}': {state_time.shape}. ")
+                    start_time, stop_time = state_time
+                    if not np.isnan(start_time):
+                        state_rows.append(
+                            {
+                                "state_name": state_name,
+                                "start_time": start_time,
+                                "stop_time": stop_time,
+                            }
+                        )
+
+        # Sort by start_time
+        if state_rows:
+            states = pd.DataFrame(state_rows)
+            states = states.sort_values(by="start_time")
+            for _, row in states.iterrows():
+                state_type = state_types.state_name[:].index(row["state_name"])
+                states_table.add_row(
+                    state_type=state_type,
+                    start_time=row["start_time"],
+                    stop_time=row["stop_time"],
+                    check_ragged=False,
+                )
 
         return state_types, states_table
 
@@ -302,43 +349,64 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         parsed_events = self._get_parsed_events(stub_test=stub_test)
 
-        for event_name in parsed_events[0]["pokes"]:
-            if not isinstance(parsed_events[0]["pokes"][event_name], np.ndarray):
+        # Add event types
+        first_trial_events = parsed_events[0]["pokes"]
+        for event_name in first_trial_events:
+            if not isinstance(first_trial_events[event_name], np.ndarray):
                 continue
             event_types.add_row(
                 event_name=event_name,
                 check_ragged=False,
             )
 
+        # Collect all event rows
+        event_rows = []
         for trial_events in parsed_events:
             pokes = trial_events["pokes"]
             event_names = event_types.event_name[:]
             for event_name in event_names:
-                event_type = event_types.event_name[:].index(event_name)
-                if len(pokes[event_name]) == 0:
-                    # print(f"Skipping event {event_name} with no recorded times.")
+                event_times = pokes[event_name]
+                if len(event_times) == 0:
                     continue
-                elif len(pokes[event_name].shape) == 1:
-                    if np.isnan(pokes[event_name][0]):
-                        continue
-                    events_table.add_row(
-                        event_type=event_type,
-                        timestamp=pokes[event_name][0],
-                        duration=pokes[event_name][1] - pokes[event_name][0],
-                        value="In",  # enter state
-                        check_ragged=False,
-                    )
-                else:
-                    for poke_time in pokes[event_name]:
-                        if np.isnan(poke_time[0]):
-                            continue
-                        events_table.add_row(
-                            event_type=event_type,
-                            timestamp=poke_time[0],
-                            duration=poke_time[1] - poke_time[0],
-                            value="In",  # value feels redundant here, but it is required by the EventsTable
-                            check_ragged=False,
+
+                value = pokes["starting_state"].get(event_name, "out")
+                # Single interval: shape (2,)
+                if event_times.shape == (2,):
+                    if not np.isnan(event_times[0]):
+                        event_rows.append(
+                            {
+                                "event_name": event_name,
+                                "timestamp": event_times[0],
+                                "duration": event_times[1] - event_times[0],
+                                "value": value,
+                            }
                         )
+                # General case: iterate over intervals
+                else:
+                    for event_time in event_times:
+                        if not np.isnan(event_time[0]):
+                            event_rows.append(
+                                {
+                                    "event_name": event_name,
+                                    "timestamp": event_time[0],
+                                    "duration": event_time[1] - event_time[0],
+                                    "value": value,
+                                }
+                            )
+
+        # Sort by timestamp
+        if event_rows:
+            events = pd.DataFrame(event_rows)
+            events = events.sort_values(by="timestamp")
+            for _, row in events.iterrows():
+                event_type = event_types.event_name[:].index(row["event_name"])
+                events_table.add_row(
+                    event_type=event_type,
+                    timestamp=row["timestamp"],
+                    duration=row["duration"],
+                    value=row["value"],
+                    check_ragged=False,
+                )
         return event_types, events_table
 
     def create_actions(self, metadata: dict, stub_test: bool = False) -> tuple[ActionTypesTable, ActionsTable]:
@@ -367,38 +435,62 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         parsed_events = self._get_parsed_events(stub_test=stub_test)
 
-        for action_name in parsed_events[0]["waves"]:
-            if not isinstance(parsed_events[0]["waves"][action_name], np.ndarray):
+        first_trial_actions = parsed_events[0]["waves"]
+        for action_name in first_trial_actions:
+            if not isinstance(first_trial_actions[action_name], np.ndarray):
                 continue
             action_types.add_row(
                 action_name=action_name,
                 check_ragged=False,
             )
 
+        # Collect all action rows
+        action_rows = []
         for trial_events in parsed_events:
             waves = trial_events["waves"]
             action_names = action_types.action_name[:]
             for action_name in action_names:
-                if len(waves[action_name]) == 0:
-                    # print(f"Skipping action {action_name} with no recorded times.")
+                action_times = waves[action_name]
+                if len(action_times) == 0:
                     continue
-                elif len(waves[action_name].shape) == 1:
-                    actions_table.add_row(
-                        action_type=action_types.action_name[:].index(action_name),
-                        timestamp=waves[action_name][0],
-                        duration=waves[action_name][1] - waves[action_name][0],
-                        value="In",  # enter state
-                        check_ragged=False,
-                    )
-                else:
-                    for wave_time in waves[action_name]:
-                        actions_table.add_row(
-                            action_type=action_types.action_name[:].index(action_name),
-                            timestamp=wave_time[0],
-                            duration=wave_time[1] - wave_time[0],
-                            value="In",  # value feels redundant here, but it is required by the ActionsTable
-                            check_ragged=False,
+
+                value = waves["starting_state"].get(action_name, "out")
+                # Single interval: shape (2,)
+                if action_times.shape == (2,):
+                    if not np.isnan(action_times[0]):
+                        action_rows.append(
+                            {
+                                "action_name": action_name,
+                                "timestamp": action_times[0],
+                                "duration": action_times[1] - action_times[0],
+                                "value": value,
+                            }
                         )
+                else:
+                    for action_time in action_times:
+                        if not np.isnan(action_time[0]):
+                            action_rows.append(
+                                {
+                                    "action_name": action_name,
+                                    "timestamp": action_time[0],
+                                    "duration": action_time[1] - action_time[0],
+                                    "value": value,
+                                }
+                            )
+
+        # Sort by timestamp
+        if action_rows:
+            actions = pd.DataFrame(action_rows)
+            actions = actions.sort_values(by="timestamp")
+            for _, row in actions.iterrows():
+                action_type = action_types.action_name[:].index(row["action_name"])
+                actions_table.add_row(
+                    action_type=action_type,
+                    timestamp=row["timestamp"],
+                    duration=row["duration"],
+                    value=row["value"],
+                    check_ragged=False,
+                )
         return action_types, actions_table
 
     def create_task_arguments(self) -> TaskArgumentsTable:
@@ -406,6 +498,7 @@ class BControlBehaviorInterface(BaseDataInterface):
         task_arguments = TaskArgumentsTable(description="Task arguments for the task.")
 
         all_columns = list(self.saved.keys())
+        num_trials = len(self.saved_history["ProtocolsSection_parsed_events"])
 
         columns_to_skip = [
             "raw_events",
