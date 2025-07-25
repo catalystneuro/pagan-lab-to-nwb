@@ -493,27 +493,44 @@ class BControlBehaviorInterface(BaseDataInterface):
                 )
         return action_types, actions_table
 
-    def create_task_arguments(self) -> TaskArgumentsTable:
+    def create_task_arguments(self, metadata: dict) -> TaskArgumentsTable:
+        """
+        Create a TaskArgumentsTable from the saved data.
 
-        task_arguments = TaskArgumentsTable(description="Task arguments for the task.")
+        This method extracts task arguments from the saved data and creates a TaskArgumentsTable.
+        The task arguments include the names, descriptions, expressions, expression types, and output types.
 
-        all_columns = list(self.saved.keys())
+        Parameters
+        ----------
+        metadata : dict
+            Metadata dictionary containing information about the behavior data.
+
+        Returns
+        -------
+        TaskArgumentsTable
+            A TaskArgumentsTable containing the task arguments extracted from the saved data.
+        """
+
+        task_arguments_metadata = metadata["Behavior"]["TaskArgumentsTable"]
+        task_arguments = TaskArgumentsTable(description=task_arguments_metadata["description"])
+
+        all_arguments = list(self.saved.keys())
         num_trials = len(self.saved_history["ProtocolsSection_parsed_events"])
 
-        columns_to_skip = [
-            "raw_events",
-            "parsed_events",
-            "current_assembler",
-            "comments",
-            "my_gui",
-            "my_xyfig",
-            "ThisStimulus",
-        ]
-        all_columns = [col for col in all_columns if not any(skip in col for skip in columns_to_skip)]
-        for argument_name in all_columns:
+        for argument_name in all_arguments:
             argument_value = self.saved[argument_name]
             # expression = type(argument_value).__name__
             argument_description = "no description"  # TODO: extract this from .m if available
+            if isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
+                # Array types are added to trials directly
+                print(f"skipping char array '{argument_name}' \n {argument_value}")
+                continue
+            if isinstance(argument_value, dict):
+                # Dictionary types are added to trials directly
+                # TODO: handle dict types by concatenating the names and assigning the values
+                print(f"skipping dict '{argument_name}' \n {argument_value}")
+                continue
+
             if isinstance(argument_value, int):
                 expression_type = "integer"  # The type of the expression
                 output_type = "numeric"  # The type of the output
@@ -523,13 +540,13 @@ class BControlBehaviorInterface(BaseDataInterface):
             elif isinstance(argument_value, str):
                 expression_type = "string"
                 output_type = "text"
-            elif isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
-                continue  # Skip arrays for now, as they are not well defined in the context of task arguments
-                expression_type = "array"
-                output_type = "numeric"
+                # check for char array
+                if len(argument_value) == num_trials:
+                    # add as list of characters
+                    print(f"skipping char array '{argument_name}'\n {argument_value}")
+                    continue
             else:
-                expression_type = "unknown"
-                output_type = "unknown"
+                raise Exception(f"unknown type '{type(argument_value)}'")
 
             task_arguments.add_row(
                 argument_name=argument_name,
@@ -541,13 +558,29 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         return task_arguments
 
-    def add_task(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+    def add_task_recording_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+        """
+        Add events, states, actions, and task arguments to the NWB file as a TaskRecording.
 
+        Parameters
+        ----------
+        nwbfile : NWBFile
+            The NWB file to which the task recording will be added.
+        metadata : dict
+            Metadata dictionary containing information about the behavior data.
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+
+        """
+
+        # Create the task recording tables
         state_types_table, states_table = self.create_states(stub_test=stub_test, metadata=metadata)
         action_types_table, actions_table = self.create_actions(stub_test=stub_test, metadata=metadata)
         event_types_table, events_table = self.create_events(stub_test=stub_test, metadata=metadata)
 
-        task_arguments_table = self.create_task_arguments()
+        task_arguments_metadata = metadata["Behavior"]["TaskArgumentsTable"]
+        task_arguments_table = TaskArgumentsTable(description=task_arguments_metadata["description"])
+        # task_arguments_table = self.create_task_arguments(metadata=metadata)
 
         task = Task(
             event_types=event_types_table,
@@ -562,11 +595,11 @@ class BControlBehaviorInterface(BaseDataInterface):
         recording = TaskRecording(events=events_table, states=states_table, actions=actions_table)
         nwbfile.add_acquisition(recording)
 
-    def add_trials(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
+    def add_trials_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
         """Add trials to the NWB file."""
 
         if "task_recording" not in nwbfile.acquisition:
-            self.add_task(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+            self.add_task_recording_to_nwbfile(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
         task_recording = nwbfile.acquisition["task_recording"]
 
         states_table = task_recording.states
@@ -579,20 +612,20 @@ class BControlBehaviorInterface(BaseDataInterface):
             events_table=events_table,
             actions_table=actions_table,
         )
-        trial_start_times, trial_stop_times = self.get_trial_times()
 
+        trial_start_times, trial_stop_times = self.get_trial_times(stub_test=stub_test)
         for start, stop in zip(trial_start_times, trial_stop_times):
-            states_table_df = states_table[:]
-            states_index_mask = (states_table_df["start_time"] >= start) & (states_table_df["stop_time"] <= stop)
-            states_index_ranges = states_table_df[states_index_mask].index
+            states = states_table[:]
+            states_index_mask = (states["start_time"] >= start) & (states["stop_time"] <= stop)
+            states_index_ranges = states[states_index_mask].index
 
-            events_table_df = events_table[:]
-            events_index_mask = (events_table_df["timestamp"] >= start) & (events_table_df["timestamp"] <= stop)
-            events_index_ranges = events_table_df[events_index_mask].index
+            events = events_table[:]
+            events_index_mask = (events["timestamp"] >= start) & (events["timestamp"] <= stop)
+            events_index_ranges = events[events_index_mask].index
 
-            actions_table_df = actions_table[:]
-            actions_index_mask = (actions_table_df["timestamp"] >= start) & (actions_table_df["timestamp"] <= stop)
-            actions_index_ranges = actions_table_df[actions_index_mask].index
+            actions = actions_table[:]
+            actions_index_mask = (actions["timestamp"] >= start) & (actions["timestamp"] <= stop)
+            actions_index_ranges = actions[actions_index_mask].index
             trials_table.add_trial(
                 start_time=start,
                 stop_time=stop,
@@ -603,8 +636,109 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         nwbfile.trials = trials_table
 
-    def add_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
-        self.add_trials(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+    def add_task_arguments(
+        self,
+        nwbfile: NWBFile,
+        arguments_to_exclude: list[str] = None,
+        stub_test: bool = False,
+    ) -> None:
+        """
+        Add task arguments to the NWB file.
+
+        Parameters
+        ----------
+        nwbfile : NWBFile
+            The NWB file to which the task arguments will be added.
+        arguments_to_exclude : list[str], optional
+            List of argument names to exclude from the task arguments. If None, defaults to a predefined list.
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+        """
+        if arguments_to_exclude is None:
+            arguments_to_exclude = [
+                "raw_events",
+                "prepare_next_trial_set",
+                "parsed_events",
+                "current_assembler",
+                "comments",
+                "my_gui",
+                "my_xyfig",
+                "ThisStimulus",
+            ]
+
+        if (trials := nwbfile.trials) is None:
+            warn("No trials found in the NWB file. Skipping task arguments addition.")
+            return
+
+        num_trials = len(trials)
+        all_arguments = list(self.saved.keys())
+        array_type_arguments = dict()
+
+        if "task" not in nwbfile.lab_meta_data:
+            raise ValueError("Task metadata not found in NWB file.")
+        task = nwbfile.get_lab_meta_data("task")
+        task_arguments = task.task_arguments
+
+        task_arguments_to_add = [col for col in all_arguments if not any(skip in col for skip in arguments_to_exclude)]
+        for argument_name in task_arguments_to_add:
+            argument_value = self.saved[argument_name]
+            argument_description = "no description"  # TODO: extract this from .m if available
+            if isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
+                # Array types are added to trials directly
+                if len(argument_value):
+                    array_type_arguments[argument_name] = argument_value
+                continue
+            if isinstance(argument_value, int):
+                expression_type = "integer"  # The type of the expression
+                output_type = "numeric"  # The type of the output
+            elif isinstance(argument_value, float):
+                expression_type = "float"
+                output_type = "numeric"
+            elif isinstance(argument_value, str):
+                expression_type = "string"
+                output_type = "text"
+                # check for char array
+                if len(argument_value) == num_trials:
+                    # add as list of characters
+                    array_type_arguments[argument_name] = [a for a in argument_value]
+                    continue
+            else:
+                raise Exception(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'")
+
+            task_arguments.add_row(
+                argument_name=argument_name,
+                argument_description=argument_description,
+                expression=str(argument_value),
+                expression_type=expression_type,
+                output_type=output_type,
+            )
+
+        # Add array type arguments to trials
+        for argument_name, argument_values in array_type_arguments.items():
+            if isinstance(argument_values, list):
+                argument_values = np.array(argument_values)
+            if not np.any(argument_values) or np.isnan(argument_values).all():
+                continue
+            argument_values = argument_values[:100] if stub_test else argument_values
+            if len(argument_values) == num_trials - 1:
+                # add np.nan for the incomplete trial
+                argument_values = np.append(argument_values, np.nan)
+            if len(argument_values) == num_trials:
+                trials.add_column(
+                    name=argument_name,
+                    description="no description",  # TODO: extract this from .m if available
+                    data=argument_values,
+                )
+
+        # TODO: add event times
+        event_times_columns = [col for col in array_type_arguments.keys() if "times" in col.lower()]
+        print("Need to add event times columns:", event_times_columns)
+
+    def add_to_nwbfile(
+        self, nwbfile: NWBFile, metadata: dict, arguments_to_exclude: list[str] = None, stub_test: bool = False
+    ) -> None:
+        self.add_trials_to_nwbfile(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
+        self.add_task_arguments(nwbfile=nwbfile, stub_test=stub_test, arguments_to_exclude=arguments_to_exclude)
         get_module(
             nwbfile=nwbfile, name="behavior", description="Behavior module"
         )  # Ensure the behavior module exists for spyglass compatibility
