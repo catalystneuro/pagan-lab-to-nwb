@@ -48,7 +48,7 @@ class BControlBehaviorInterface(BaseDataInterface):
         file_path : Path or str
             The path to the BControl data file to be converted.
         starting_state : str, default: "state_0"
-            The name of the starting state for the trials. This is used to identify the start of each trial.
+            The name of the starting state for the trials. This is used to identify the start time of each trial.
         verbose : bool, default: False
         """
 
@@ -56,8 +56,8 @@ class BControlBehaviorInterface(BaseDataInterface):
         self.verbose = verbose
         self.starting_state = starting_state
 
-    def _read_data(self):
-        """Read the BControl data file and return the data."""
+    def _read_file(self):
+        """Read the BControl .mat file and extract the 'saved' and 'saved_history' data."""
         from pymatreader import read_mat
 
         if hasattr(self, "saved") and hasattr(self, "saved_history"):
@@ -75,8 +75,20 @@ class BControlBehaviorInterface(BaseDataInterface):
         self.saved_history = mat_data["saved_history"]
 
     def _get_parsed_events(self, stub_test: bool = False) -> list[dict]:
-        """Get parsed events from the saved history."""
-        self._read_data()
+        """
+        Get parsed events from the 'ProtocolsSection_parsed_events' key from 'saved_history'.
+
+        Parameters
+        ----------
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+
+        Returns
+        -------
+        list[dict]
+            A list of parsed events, where each event is a dictionary containing state, poke, and wave information.
+        """
+        self._read_file()
         if "ProtocolsSection_parsed_events" not in self.saved_history:
             raise ValueError(
                 "The saved_history does not contain 'ProtocolsSection_parsed_events'. "
@@ -95,6 +107,22 @@ class BControlBehaviorInterface(BaseDataInterface):
         return parsed_events
 
     def get_trial_times(self, stub_test: bool = False) -> (list[float], list[float]):
+        """
+        Get the start and end times of trials from the parsed events.
+        This method extracts the start and end times of trials based on the starting state.
+
+        Parameters
+        ----------
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+
+        Returns
+        -------
+        tuple[list[float], list[float]]
+            A tuple containing two lists:
+            - The start times of the trials.
+            - The end times of the trials.
+        """
         parsed_events = self._get_parsed_events(stub_test=stub_test)
 
         trial_start_times = [events["states"][self.starting_state][0][1] for events in parsed_events]
@@ -150,7 +178,7 @@ class BControlBehaviorInterface(BaseDataInterface):
             TaskArgumentsTable=dict(description="Contains the task arguments for the task."),
         )
 
-        self._read_data()
+        self._read_file()
         # extract session_start_time from the protocol title
         protocol_title = [key for key in self.saved.keys() if "prot_title" in key]
         if len(protocol_title) == 1:
@@ -177,7 +205,8 @@ class BControlBehaviorInterface(BaseDataInterface):
         return metadata
 
     def create_states(self, metadata: dict, stub_test: bool = False) -> tuple[StateTypesTable, StatesTable]:
-        """Create states and state types tables from the parsed events.
+        """
+        Create states and state types tables from the parsed events.
          This method extracts state information from the parsed events and creates
          the corresponding StateTypesTable and StatesTable.
 
@@ -187,6 +216,11 @@ class BControlBehaviorInterface(BaseDataInterface):
              Metadata dictionary containing information about the behavior data.
          stub_test : bool, default: False
              If True, only a subset of trials will be processed for testing purposes.
+
+        Returns
+        -------
+        tuple[StateTypesTable, StatesTable]
+            A tuple containing the StateTypesTable and StatesTable.
         """
         state_types = StateTypesTable(description=metadata["Behavior"]["StateTypesTable"]["description"])
         states_table = StatesTable(
@@ -243,7 +277,24 @@ class BControlBehaviorInterface(BaseDataInterface):
         return state_types, states_table
 
     def create_events(self, metadata: dict, stub_test: bool = False) -> tuple[EventTypesTable, EventsTable]:
-        # todo: add metadata for event types and events tables
+        """
+        Create events and event types tables from the parsed events.
+
+        This method extracts event information from the parsed events and creates
+        the corresponding EventTypesTable and EventsTable.
+
+        Parameters
+        ----------
+        metadata : dict
+            Metadata dictionary containing information about the behavior data.
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+
+        Returns
+        -------
+        tuple[EventTypesTable, EventsTable]
+            A tuple containing the EventTypesTable and EventsTable.
+        """
         event_types = EventTypesTable(description=metadata["Behavior"]["EventTypesTable"]["description"])
         events_table = EventsTable(
             description=metadata["Behavior"]["EventsTable"]["description"], event_types_table=event_types
@@ -291,6 +342,24 @@ class BControlBehaviorInterface(BaseDataInterface):
         return event_types, events_table
 
     def create_actions(self, metadata: dict, stub_test: bool = False) -> tuple[ActionTypesTable, ActionsTable]:
+        """
+        Create actions and action types tables from the parsed events.
+
+        This method extracts action information from the parsed events and creates
+        the corresponding ActionTypesTable and ActionsTable.
+
+        Parameters
+        ----------
+        metadata : dict
+            Metadata dictionary containing information about the behavior data.
+        stub_test : bool, default: False
+            If True, only a subset of trials will be processed for testing purposes.
+
+        Returns
+        -------
+        tuple[ActionTypesTable, ActionsTable]
+            A tuple containing the ActionTypesTable and ActionsTable.
+        """
         action_types = ActionTypesTable(description=metadata["Behavior"]["ActionTypesTable"]["description"])
         actions_table = ActionsTable(
             description=metadata["Behavior"]["ActionTypesTable"]["description"], action_types_table=action_types
