@@ -688,6 +688,8 @@ class BControlBehaviorInterface(BaseDataInterface):
                 if len(argument_value):
                     array_type_arguments[argument_name] = argument_value
                 continue
+            if isinstance(argument_value, dict):
+                continue
             if isinstance(argument_value, int):
                 expression_type = "integer"  # The type of the expression
                 output_type = "numeric"  # The type of the output
@@ -703,7 +705,8 @@ class BControlBehaviorInterface(BaseDataInterface):
                     array_type_arguments[argument_name] = [a for a in argument_value]
                     continue
             else:
-                raise Exception(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'")
+                warn(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'. Skipping.")
+                print(f"Skipping argument '{argument_name}' with value: {argument_value}")
 
             task_arguments.add_row(
                 argument_name=argument_name,
@@ -717,18 +720,27 @@ class BControlBehaviorInterface(BaseDataInterface):
         for argument_name, argument_values in array_type_arguments.items():
             if isinstance(argument_values, list):
                 argument_values = np.array(argument_values)
-            if not np.any(argument_values) or np.isnan(argument_values).all():
+            if len(argument_values) and isinstance(argument_values[0], str):
+                argument_values = argument_values[:100] if stub_test else argument_values
+                if len(argument_values) == num_trials:
+                    trials.add_column(
+                        name=argument_name,
+                        description="no description",  # TODO: extract this from .m if available
+                        data=argument_values,
+                    )
+            elif np.isnan(argument_values).all():
                 continue
-            argument_values = argument_values[:100] if stub_test else argument_values
-            if len(argument_values) == num_trials - 1:
-                # add np.nan for the incomplete trial
-                argument_values = np.append(argument_values, np.nan)
-            if len(argument_values) == num_trials:
-                trials.add_column(
-                    name=argument_name,
-                    description="no description",  # TODO: extract this from .m if available
-                    data=argument_values,
-                )
+            else:
+                argument_values = argument_values[:100] if stub_test else argument_values
+                if len(argument_values) == num_trials - 1:
+                    # add np.nan for the incomplete trial
+                    argument_values = np.append(argument_values, np.nan)
+                if len(argument_values) == num_trials:
+                    trials.add_column(
+                        name=argument_name,
+                        description="no description",  # TODO: extract this from .m if available
+                        data=argument_values,
+                    )
 
         # TODO: add event times
         event_times_columns = [col for col in array_type_arguments.keys() if "times" in col.lower()]
