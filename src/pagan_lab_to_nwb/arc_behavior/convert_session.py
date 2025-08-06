@@ -3,7 +3,7 @@
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from pydantic import FilePath
+from pydantic import DirectoryPath, FilePath
 
 from neuroconv.utils import dict_deep_update, load_dict_from_file
 from pagan_lab_to_nwb.arc_behavior import ArcBehaviorNWBConverter
@@ -11,7 +11,7 @@ from pagan_lab_to_nwb.arc_behavior import ArcBehaviorNWBConverter
 
 def session_to_nwb(
     file_path: FilePath,
-    nwbfile_path: FilePath,
+    nwb_folder_path: DirectoryPath,
     stub_test: bool = False,
     overwrite: bool = True,
 ):
@@ -22,13 +22,15 @@ def session_to_nwb(
     ----------
     file_path : FilePath
         Path to the BControl behavior data file (e.g., .mat file).
-    nwbfile_path : FilePath
-        Path where the NWB file will be saved.
+    nwb_folder_path : DirectoryPath
+        Path to the directory where the NWB file will be saved.
     stub_test : bool, optional
         If True, runs a stub test without full conversion. Default is False.
     overwrite : bool, optional
         If True, overwrites the existing NWB file if it exists. Default is True.
     """
+    nwb_folder_path = Path(nwb_folder_path)
+    nwb_folder_path.mkdir(parents=True, exist_ok=True)
 
     source_data = dict()
     conversion_options = dict()
@@ -51,13 +53,15 @@ def session_to_nwb(
     metadata = dict_deep_update(metadata, editable_metadata)
 
     file_path = Path(file_path)
-    file_name = file_path.name  # data_@TaskSwitch6_Nuria_H7015_250516a
+    file_name = file_path.stem  # data_@TaskSwitch6_Nuria_H7015_250516a
     # extract data_@{protocol_name}_{experimenter}_{subject_id}_{session_id} pattern from file name
     file_name = file_name.replace("data_@", "")  # Remove 'data_@' prefix
     protocol_name, experimenter, subject_id, session_id = file_name.split("_")
 
     metadata["Subject"]["subject_id"] = subject_id
     metadata["NWBFile"]["session_id"] = session_id
+
+    nwbfile_path = nwb_folder_path / f"sub-{subject_id}_ses-{session_id}.nwb"
 
     # Run conversion
     converter.run_conversion(
@@ -72,13 +76,14 @@ if __name__ == "__main__":
 
     # Parameters for conversion
     behavior_file_path = '/Users/weian/data/Pagan/Protocol "TaskSwitch6"/data_@TaskSwitch6_Nuria_H7015_250516a.mat'
-    nwbfile_path = "/Volumes/T9/data/Pagan/raw/sub-H7015_ses-250516a.nwb"
-    stub_test = True
+    nwb_folder_path = "/Volumes/T9/data/Pagan/raw"
+
+    stub_test = False
     overwrite = True
 
     session_to_nwb(
         file_path=behavior_file_path,
-        nwbfile_path=nwbfile_path,
+        nwb_folder_path=nwb_folder_path,
         stub_test=stub_test,
         overwrite=overwrite,
     )
