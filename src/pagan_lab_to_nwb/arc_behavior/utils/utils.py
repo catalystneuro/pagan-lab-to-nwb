@@ -148,6 +148,36 @@ def write_yaml(data: Dict, output_path: Path) -> None:
     print(f"YAML saved to: '{output_path}'")
 
 
+def get_description_from_arguments_metadata(
+    arguments_metadata: Dict[str, Dict[str, Dict[str, str]]], argument_name: str
+) -> str:
+    """
+    Get the description of a specific argument from the arguments metadata.
+
+    Parameters
+    ----------
+    arguments_metadata : Dict[str, Dict[str, Dict[str, str]]]
+        The metadata dictionary containing argument descriptions.
+    argument_name : str
+        The name of the argument in the format "SectionName_ArgumentName".
+
+    Returns
+    -------
+    str
+        The description of the argument, or "no description" if not found.
+    """
+    description = "no description"
+    if arguments_metadata is None:
+        return description
+    try:
+        section_name, arg_name = argument_name.split("_", maxsplit=1)
+        if section_name in arguments_metadata and arg_name in arguments_metadata[section_name]:
+            description = arguments_metadata[section_name][arg_name]["description"]
+    except ValueError:
+        raise ValueError(f"Argument name '{argument_name}' is not in the expected format 'SectionName_ArgumentName'.")
+    return description
+
+
 # -------------------------------
 # If running directly (CLI use)
 # -------------------------------
