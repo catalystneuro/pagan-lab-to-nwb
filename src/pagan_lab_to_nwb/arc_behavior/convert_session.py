@@ -12,6 +12,7 @@ from pagan_lab_to_nwb.arc_behavior import ArcBehaviorNWBConverter
 def session_to_nwb(
     file_path: FilePath,
     nwb_folder_path: DirectoryPath,
+    task_params_file_path: FilePath = None,
     stub_test: bool = False,
     overwrite: bool = True,
 ):
@@ -24,6 +25,9 @@ def session_to_nwb(
         Path to the BControl behavior data file (e.g., .mat file).
     nwb_folder_path : DirectoryPath
         Path to the directory where the NWB file will be saved.
+    task_params_file_path : FilePath, optional
+        Path to the YAML file containing task parameters and their descriptions.
+        If None, uses 'no description' for all task parameter descriptions.
     stub_test : bool, optional
         If True, runs a stub test without full conversion. Default is False.
     overwrite : bool, optional
@@ -38,6 +42,15 @@ def session_to_nwb(
     # Add Behavior
     source_data.update(dict(Behavior=dict(file_path=file_path)))
     conversion_options.update(dict(Behavior=dict(stub_test=stub_test)))
+    # Add task parameters from YAML file
+    if task_params_file_path is not None:
+        task_params_file_path = Path(task_params_file_path)
+        if not task_params_file_path.exists():
+            raise FileNotFoundError(f"YAML file not found: '{task_params_file_path}'. Please provide a valid path.")
+        arguments_metadata = load_dict_from_file(task_params_file_path)
+        conversion_options["Behavior"].update(
+            arguments_metadata=arguments_metadata,
+        )
 
     converter = ArcBehaviorNWBConverter(source_data=source_data)
 
@@ -77,6 +90,11 @@ if __name__ == "__main__":
     # Parameters for conversion
     behavior_file_path = '/Users/weian/data/Pagan/Protocol "TaskSwitch6"/data_@TaskSwitch6_Nuria_H7015_250516a.mat'
     nwb_folder_path = "/Volumes/T9/data/Pagan/raw"
+
+    # Path to the YAML file containing task parameters and their descriptions
+    # This file should be generated from the MATLAB code files in the Protocol_code folder
+    # See utils/notes.md for instructions on how to generate this file
+    yaml_file_path = Path('/Users/weian/data/Pagan/Protocol "TaskSwitch6"/Protocol_code') / "task_switch6_params.yaml"
 
     stub_test = False
     overwrite = True
