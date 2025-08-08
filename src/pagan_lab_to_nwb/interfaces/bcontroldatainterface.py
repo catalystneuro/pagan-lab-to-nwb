@@ -26,6 +26,7 @@ from pynwb.file import NWBFile
 from neuroconv.basedatainterface import BaseDataInterface
 from neuroconv.tools import get_module
 from neuroconv.utils import DeepDict, get_base_schema, get_schema_from_hdmf_class
+from pagan_lab_to_nwb.arc_behavior.utils import get_description_from_arguments_metadata
 
 
 # TODO: implement this interface in NeuroConv
@@ -640,6 +641,7 @@ class BControlBehaviorInterface(BaseDataInterface):
         self,
         nwbfile: NWBFile,
         arguments_to_exclude: list[str] = None,
+        arguments_metadata: dict = None,
         stub_test: bool = False,
     ) -> None:
         """
@@ -651,6 +653,8 @@ class BControlBehaviorInterface(BaseDataInterface):
             The NWB file to which the task arguments will be added.
         arguments_to_exclude : list[str], optional
             List of argument names to exclude from the task arguments. If None, defaults to a predefined list.
+        arguments_metadata : dict, optional
+            Metadata for the task arguments.
         stub_test : bool, default: False
             If True, only a subset of trials will be processed for testing purposes.
         """
@@ -681,8 +685,10 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         task_arguments_to_add = [col for col in all_arguments if not any(skip in col for skip in arguments_to_exclude)]
         for argument_name in task_arguments_to_add:
+            # Get description for task arguments
+            argument_description = get_description_from_arguments_metadata(arguments_metadata, argument_name)
+
             argument_value = self.saved[argument_name]
-            argument_description = "no description"  # TODO: extract this from .m if available
             if isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
                 # Array types are added to trials directly
                 if len(argument_value):
@@ -705,8 +711,7 @@ class BControlBehaviorInterface(BaseDataInterface):
                     array_type_arguments[argument_name] = [a for a in argument_value]
                     continue
             else:
-                warn(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'. Skipping.")
-                print(f"Skipping argument '{argument_name}' with value: {argument_value}")
+                raise Exception(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'.")
 
             task_arguments.add_row(
                 argument_name=argument_name,
@@ -718,6 +723,9 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         # Add array type arguments to trials
         for argument_name, argument_values in array_type_arguments.items():
+            # Get description for array type arguments
+            argument_description = get_description_from_arguments_metadata(arguments_metadata, argument_name)
+
             if isinstance(argument_values, list):
                 argument_values = np.array(argument_values)
             if len(argument_values) and isinstance(argument_values[0], str):
@@ -725,7 +733,7 @@ class BControlBehaviorInterface(BaseDataInterface):
                 if len(argument_values) == num_trials:
                     trials.add_column(
                         name=argument_name,
-                        description="no description",  # TODO: extract this from .m if available
+                        description=argument_description,
                         data=argument_values,
                     )
             elif np.isnan(argument_values).all():
@@ -738,7 +746,7 @@ class BControlBehaviorInterface(BaseDataInterface):
                 if len(argument_values) == num_trials:
                     trials.add_column(
                         name=argument_name,
-                        description="no description",  # TODO: extract this from .m if available
+                        description=argument_description,
                         data=argument_values,
                     )
 
@@ -747,10 +755,20 @@ class BControlBehaviorInterface(BaseDataInterface):
         print("Need to add event times columns:", event_times_columns)
 
     def add_to_nwbfile(
-        self, nwbfile: NWBFile, metadata: dict, arguments_to_exclude: list[str] = None, stub_test: bool = False
+        self,
+        nwbfile: NWBFile,
+        metadata: dict,
+        arguments_to_exclude: list[str] = None,
+        arguments_metadata: dict = None,
+        stub_test: bool = False,
     ) -> None:
         self.add_trials_to_nwbfile(nwbfile=nwbfile, metadata=metadata, stub_test=stub_test)
-        self.add_task_arguments(nwbfile=nwbfile, stub_test=stub_test, arguments_to_exclude=arguments_to_exclude)
+        self.add_task_arguments(
+            nwbfile=nwbfile,
+            stub_test=stub_test,
+            arguments_to_exclude=arguments_to_exclude,
+            arguments_metadata=arguments_metadata,
+        )
         get_module(
             nwbfile=nwbfile, name="behavior", description="Behavior module"
         )  # Ensure the behavior module exists for spyglass compatibility
