@@ -15,7 +15,7 @@ def session_to_nwb(
     task_params_file_path: FilePath = None,
     stub_test: bool = False,
     overwrite: bool = True,
-):
+) -> FilePath:
     """
     Convert a session of BControl data to NWB format.
 
@@ -32,6 +32,11 @@ def session_to_nwb(
         If True, runs a stub test without full conversion. Default is False.
     overwrite : bool, optional
         If True, overwrites the existing NWB file if it exists. Default is True.
+
+    Returns
+    -------
+    FilePath
+        Path to the converted NWB file.
     """
     nwb_folder_path = Path(nwb_folder_path)
     nwb_folder_path.mkdir(parents=True, exist_ok=True)
@@ -84,6 +89,8 @@ def session_to_nwb(
         overwrite=overwrite,
     )
 
+    return nwbfile_path
+
 
 if __name__ == "__main__":
 
@@ -102,6 +109,7 @@ if __name__ == "__main__":
     session_to_nwb(
         file_path=behavior_file_path,
         nwb_folder_path=nwb_folder_path,
+        task_params_file_path=yaml_file_path,
         stub_test=stub_test,
         overwrite=overwrite,
     )
