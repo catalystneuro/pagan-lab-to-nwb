@@ -146,6 +146,7 @@ class BControlBehaviorInterface(BaseDataInterface):
                 "EventTypesTable",
                 "EventsTable",
                 "TrialsTable",
+                "TaskArgumentsTable",
             ],
             properties=dict(
                 Device=device_schema,
@@ -494,71 +495,6 @@ class BControlBehaviorInterface(BaseDataInterface):
                 )
         return action_types, actions_table
 
-    def create_task_arguments(self, metadata: dict) -> TaskArgumentsTable:
-        """
-        Create a TaskArgumentsTable from the saved data.
-
-        This method extracts task arguments from the saved data and creates a TaskArgumentsTable.
-        The task arguments include the names, descriptions, expressions, expression types, and output types.
-
-        Parameters
-        ----------
-        metadata : dict
-            Metadata dictionary containing information about the behavior data.
-
-        Returns
-        -------
-        TaskArgumentsTable
-            A TaskArgumentsTable containing the task arguments extracted from the saved data.
-        """
-
-        task_arguments_metadata = metadata["Behavior"]["TaskArgumentsTable"]
-        task_arguments = TaskArgumentsTable(description=task_arguments_metadata["description"])
-
-        all_arguments = list(self.saved.keys())
-        num_trials = len(self.saved_history["ProtocolsSection_parsed_events"])
-
-        for argument_name in all_arguments:
-            argument_value = self.saved[argument_name]
-            # expression = type(argument_value).__name__
-            argument_description = "no description"  # TODO: extract this from .m if available
-            if isinstance(argument_value, np.ndarray) or isinstance(argument_value, list):
-                # Array types are added to trials directly
-                print(f"skipping char array '{argument_name}' \n {argument_value}")
-                continue
-            if isinstance(argument_value, dict):
-                # Dictionary types are added to trials directly
-                # TODO: handle dict types by concatenating the names and assigning the values
-                print(f"skipping dict '{argument_name}' \n {argument_value}")
-                continue
-
-            if isinstance(argument_value, int):
-                expression_type = "integer"  # The type of the expression
-                output_type = "numeric"  # The type of the output
-            elif isinstance(argument_value, float):
-                expression_type = "float"
-                output_type = "numeric"
-            elif isinstance(argument_value, str):
-                expression_type = "string"
-                output_type = "text"
-                # check for char array
-                if len(argument_value) == num_trials:
-                    # add as list of characters
-                    print(f"skipping char array '{argument_name}'\n {argument_value}")
-                    continue
-            else:
-                raise Exception(f"unknown type '{type(argument_value)}'")
-
-            task_arguments.add_row(
-                argument_name=argument_name,
-                argument_description=argument_description,
-                expression=str(argument_value),
-                expression_type=expression_type,
-                output_type=output_type,
-            )
-
-        return task_arguments
-
     def add_task_recording_to_nwbfile(self, nwbfile: NWBFile, metadata: dict, stub_test: bool = False) -> None:
         """
         Add events, states, actions, and task arguments to the NWB file as a TaskRecording.
@@ -581,7 +517,6 @@ class BControlBehaviorInterface(BaseDataInterface):
 
         task_arguments_metadata = metadata["Behavior"]["TaskArgumentsTable"]
         task_arguments_table = TaskArgumentsTable(description=task_arguments_metadata["description"])
-        # task_arguments_table = self.create_task_arguments(metadata=metadata)
 
         task = Task(
             event_types=event_types_table,
