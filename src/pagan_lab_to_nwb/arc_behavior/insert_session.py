@@ -55,10 +55,6 @@ def insert_session(nwbfile_path: Path, rollback_on_fail: bool = True, raise_err:
     if not task_rec & nwb_dict:
         task_rec.insert_from_nwbfile(nwb_copy_file_name, nwbfile)
 
-    # Fetch trials DataFrame
-    trials = (task_rec & nwb_dict).fetch1_dataframe("trials")
-    print(trials.head())
-
 
 def print_tables(nwbfile_path: Path):
     """Print the contents of the TaskRecordingTypes tables for the given NWB file."""
