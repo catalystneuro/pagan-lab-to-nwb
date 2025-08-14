@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import datajoint as dj
+import pandas as pd
 from numpy.testing import assert_array_equal
 
 dj_local_conf_path = "/Users/weian/catalystneuro/pagan-lab-to-nwb/src/pagan_lab_to_nwb/spyglass_mock/dj_local_conf.json"
@@ -59,6 +60,30 @@ def insert_session(nwbfile_path: Path, rollback_on_fail: bool = True, raise_err:
     print(trials.head())
 
 
+def print_tables(nwbfile_path: Path):
+    """Print the contents of the TaskRecordingTypes tables for the given NWB file."""
+
+    nwb_copy_file_name = get_nwb_copy_filename(nwbfile_path.name)
+    nwb_dict = dict(nwb_file_name=nwb_copy_file_name)
+    with open("tables.txt", "w") as f:
+        print("=== TaskRecordingTypes.StateTypes ===", file=f)
+        state_types = (TaskRecordingTypes.StateTypes() & nwb_dict).fetch(as_dict=True)
+        state_types_df = pd.DataFrame(state_types).set_index("id")
+        print(state_types_df.to_markdown(), file=f)
+        print("\n=== TaskRecordingTypes.EventTypes ===", file=f)
+        event_types = (TaskRecordingTypes.EventTypes() & nwb_dict).fetch(as_dict=True)
+        event_types_df = pd.DataFrame(event_types).set_index("id")
+        print(event_types_df.to_markdown(), file=f)
+        print("\n=== TaskRecordingTypes.ActionTypes ===", file=f)
+        action_types = (TaskRecordingTypes.ActionTypes() & nwb_dict).fetch(as_dict=True)
+        action_types_df = pd.DataFrame(action_types).set_index("id")
+        print(action_types_df.to_markdown(), file=f)
+        print("\n=== TaskRecordingTypes.Arguments ===", file=f)
+        arguments = (TaskRecordingTypes.Arguments() & nwb_dict).fetch(as_dict=True)
+        arguments_df = pd.DataFrame(arguments)
+        print(arguments_df.to_markdown(), file=f)
+
+
 def test_task_recording_types(nwbfile_path: Path):
     """Test the TaskRecordingTypes against the NWB file."""
 
@@ -90,4 +115,5 @@ if __name__ == "__main__":
     data_path = Path(raw_dir) / nwb_file_name
 
     insert_session(nwbfile_path=data_path)
+    print_tables(nwbfile_path=data_path)
     test_task_recording_types(nwbfile_path=data_path)
