@@ -107,7 +107,7 @@ def test_task_recording_types(nwbfile_path: Path):
 
 if __name__ == "__main__":
 
-    nwb_file_name = "sub-H7015_ses-250516a-test.nwb"
+    nwb_file_name = "sub-P131_ses-190815a.nwb"
     data_path = Path(raw_dir) / nwb_file_name
 
     insert_session(nwbfile_path=data_path)
