@@ -24,7 +24,6 @@ from pynwb.device import Device
 from pynwb.file import NWBFile
 
 from neuroconv.basedatainterface import BaseDataInterface
-from neuroconv.tools import get_module
 from neuroconv.utils import DeepDict, get_base_schema, get_schema_from_hdmf_class
 from pagan_lab_to_nwb.arc_behavior.utils import get_description_from_arguments_metadata
 
@@ -685,10 +684,6 @@ class BControlBehaviorInterface(BaseDataInterface):
                         data=argument_values,
                     )
 
-        # TODO: add event times
-        event_times_columns = [col for col in array_type_arguments.keys() if "times" in col.lower()]
-        print("Need to add event times columns:", event_times_columns)
-
     def add_to_nwbfile(
         self,
         nwbfile: NWBFile,
@@ -704,6 +699,3 @@ class BControlBehaviorInterface(BaseDataInterface):
             arguments_to_exclude=arguments_to_exclude,
             arguments_metadata=arguments_metadata,
         )
-        get_module(
-            nwbfile=nwbfile, name="behavior", description="Behavior module"
-        )  # Ensure the behavior module exists for spyglass compatibility
