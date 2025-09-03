@@ -23,8 +23,10 @@ dependencies = [
 Repository="https://github.com/catalystneuro/pagan-lab-to-nwb"
 
 [project.optional-dependencies]
-arc_ecephys = [
-  "neuroconv==0.7.3"   # Pinned dependencies to specific versions
+arc_behavior = [
+  "neuroconv==0.7.5",   # Pinned dependencies to specific versions
+  "pymatreader>=1.0.0",
+  # "git+https://github.com/rly/ndx-structured-behavior.git@main",
 ]
 
 [build-system]
