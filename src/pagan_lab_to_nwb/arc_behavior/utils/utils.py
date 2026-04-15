@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from typing import Dict, List
 
 import yaml
 from pydantic import DirectoryPath, FilePath
@@ -25,7 +24,7 @@ def read_matlab_file(file_path: FilePath) -> str:
     return re.sub(r"\.\.\.\s*", " ", content)
 
 
-def extract_param_blocks(text: str) -> List[str]:
+def extract_param_blocks(text: str) -> list[str]:
     """
     Extract all *Param(...) blocks from the MATLAB code.
 
@@ -36,14 +35,14 @@ def extract_param_blocks(text: str) -> List[str]:
 
     Returns
     -------
-    List[str]
+    list[str]
         A list of strings, each representing a *Param block.
     """
     pattern = re.compile(r"\b\w*Param\s*\((.*?)\);", re.DOTALL)
     return pattern.findall(text)
 
 
-def parse_param_block(block: str) -> Dict[str, str]:
+def parse_param_block(block: str) -> dict[str, str]:
     """
     Extract the parameter name and its description (TooltipString or label)
     from a *Param block.
@@ -55,7 +54,7 @@ def parse_param_block(block: str) -> Dict[str, str]:
 
     Returns
     -------
-    Dict[str, str]
+    dict[str, str]
         A dictionary with the parameter name as the key and its description as the value.
     """
     args = re.findall(r"'(.*?)'", block)
@@ -83,7 +82,7 @@ def parse_param_block(block: str) -> Dict[str, str]:
         return {}
 
 
-def parse_matlab_file(file_path: FilePath) -> Dict[str, Dict[str, Dict[str, str]]]:
+def parse_matlab_file(file_path: FilePath) -> dict[str, dict[str, dict[str, str]]]:
     """
     Parse a single MATLAB .m file and return a dict of parameters.
 
@@ -94,7 +93,7 @@ def parse_matlab_file(file_path: FilePath) -> Dict[str, Dict[str, Dict[str, str]
 
     Returns
     -------
-    Dict[str, Dict[str, Dict[str, str]]]
+    dict[str, dict[str, dict[str, str]]]
         A dictionary with section names as keys and dictionaries of parameters as values.
     """
     section_name = file_path.stem
@@ -111,7 +110,7 @@ def parse_matlab_file(file_path: FilePath) -> Dict[str, Dict[str, Dict[str, str]
     return {section_name: section_params}
 
 
-def parse_all_matlab_files(folder_path: DirectoryPath) -> Dict[str, Dict[str, Dict[str, str]]]:
+def parse_all_matlab_files(folder_path: DirectoryPath) -> dict[str, dict[str, dict[str, str]]]:
     """
     Parse all MATLAB .m files in the given folder.
 
@@ -122,7 +121,7 @@ def parse_all_matlab_files(folder_path: DirectoryPath) -> Dict[str, Dict[str, Di
 
     Returns
     -------
-    Dict[str, Dict[str, Dict[str, str]]]
+    dict[str, dict[str, dict[str, str]]]
         A dictionary with section names as keys and dictionaries of parameters as values.
     """
     results = {}
@@ -132,13 +131,13 @@ def parse_all_matlab_files(folder_path: DirectoryPath) -> Dict[str, Dict[str, Di
     return results
 
 
-def write_yaml(data: Dict, output_path: Path) -> None:
+def write_yaml(data: dict, output_path: Path) -> None:
     """
     Write the results dictionary to a YAML file.
 
     Parameters
     ----------
-    data : Dict
+    data : dict
         The dictionary containing the parsed parameters.
     output_path : Path
         The path where the YAML file will be saved.
@@ -149,14 +148,14 @@ def write_yaml(data: Dict, output_path: Path) -> None:
 
 
 def get_description_from_arguments_metadata(
-    arguments_metadata: Dict[str, Dict[str, Dict[str, str]]], argument_name: str
+    arguments_metadata: dict[str, dict[str, dict[str, str]]] | None, argument_name: str
 ) -> str:
     """
     Get the description of a specific argument from the arguments metadata.
 
     Parameters
     ----------
-    arguments_metadata : Dict[str, Dict[str, Dict[str, str]]]
+    arguments_metadata : dict[str, dict[str, dict[str, str]]] | None
         The metadata dictionary containing argument descriptions.
     argument_name : str
         The name of the argument in the format "SectionName_ArgumentName".
@@ -183,7 +182,8 @@ def get_description_from_arguments_metadata(
 # -------------------------------
 if __name__ == "__main__":
     protocol_code_folder_path = Path('/Users/weian/data/Pagan/Protocol "TaskSwitch6"/Protocol_code')
-    yaml_file_path = protocol_code_folder_path / "task_switch6_params.yaml"
+    # Output goes to the repo so the YAML is under version control
+    yaml_file_path = Path(__file__).parent.parent / "task_switch6_params.yaml"
 
     all_results = parse_all_matlab_files(protocol_code_folder_path)
     write_yaml(all_results, yaml_file_path)

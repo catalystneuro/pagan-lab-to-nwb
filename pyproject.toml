@@ -1,34 +1,46 @@
 [project]
 name = "pagan-lab-to-nwb"
 version = "0.0.1"
-description = "NWB conversion scripts, functions, and classes for Pagan  conversion"
+description = "NWB conversion scripts, functions, and classes for Pagan conversion"
 readme = "README.md"
 authors = [{ name = "CatalystNeuro", email = "ben.dichter@catalystneuro.com" }]
 maintainers = [{ name = "CatalystNeuro", email = "ben.dichter@catalystneuro.com" }]
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10,<3.13"
+
 classifiers = [
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 
 dependencies = [
-  "neuroconv",
-  "nwbinspector",
-]
+  # DANDI dependencies (data upload)
+  "dandi>=0.74.3",
 
-[project.urls]
-Repository="https://github.com/catalystneuro/pagan-lab-to-nwb"
+  # Core NWB dependencies
+  "neuroconv==0.9.3",
+  "nwbinspector==0.7.1",
+
+  # NWB extensions
+  "ndx-franklab-novela==0.2.4",
+  "ndx-optogenetics==0.3.0",
+  "ndx-structured-behavior @ git+https://github.com/rly/ndx-structured-behavior.git@main",
+
+  # Data handling
+  "pymatreader>=1.2.0",
+  "openpyxl>=3.0.0",
+  "tqdm>=4.0.0",
+  "pandas>=1.5.0",
+  "tabulate" # pretty printing
+]
 
 [project.optional-dependencies]
-arc_behavior = [
-  "neuroconv==0.7.5",   # Pinned dependencies to specific versions
-  "pymatreader>=1.0.0",
-  "tabulate", # pretty printing
-  # "git+https://github.com/rly/ndx-structured-behavior.git@main",
-]
+arc_behavior = []
+arc_ecephys = []
+
+[project.urls]
+Repository = "https://github.com/catalystneuro/pagan-lab-to-nwb"
 
 [build-system]
 requires = ["setuptools"]
@@ -43,7 +55,7 @@ include = ["*"]
 
 [tool.black]
 line-length = 120
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py310', 'py311', 'py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(

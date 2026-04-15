@@ -1,12 +1,24 @@
 """Primary script to run to convert an entire session for of data using the NWBConverter."""
 
+import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pandas as pd
 from pydantic import DirectoryPath, FilePath
 
 from neuroconv.utils import dict_deep_update, load_dict_from_file
 from pagan_lab_to_nwb.arc_behavior import ArcBehaviorNWBConverter
+
+_RAT_INFO_PATH = Path(__file__).parent / "rat_information.xlsx"
+_TASK_PARAMS_YAML_PATH = Path(__file__).parent / "task_switch6_params.yaml"
+_SEX_MAP = {"male": "M", "female": "F"}
+
+
+def _load_rat_info() -> pd.DataFrame:
+    df = pd.read_excel(_RAT_INFO_PATH)
+    df["Rat"] = df["Rat"].str.strip()
+    return df.set_index("Rat")
 
 
 def session_to_nwb(
@@ -38,8 +50,36 @@ def session_to_nwb(
     FilePath
         Path to the converted NWB file.
     """
+    file_path = Path(file_path)
+    file_name = file_path.stem  # data_@TaskSwitch6_Nuria_H7015_250516a
+    # extract data_@{protocol_name}_{experimenter}_{subject_id}_{session_id} pattern from file name
+    file_name = file_name.replace("data_@", "")  # Remove 'data_@' prefix
+    pattern = re.compile(
+        r"^(?:data_@)?(?P<protocol>[^_]+)_(?P<experimenter>[^_]+)_(?P<subject_id>[^_]+)_(?P<date_str>.+)$"
+    )
+    match = pattern.match(file_name)
+    if not match:
+        raise ValueError(
+            f"Filename does not match expected pattern (e.g. 'data_@TaskSwitch6_Nuria_H7015_250516a'): '{file_name}'"
+        )
+
+    protocol_name = match.group("protocol")
+    experimenter = match.group("experimenter")
+    subject_id = match.group("subject_id")
+    date_str = match.group("date_str")
+
+    # protocol_name and date_str are used to create session_id
+    # DANDI requires no underscores inside the session label; use hyphens throughout
+    session_id = "-".join([protocol_name.replace("_", "-"), date_str])
+
     nwb_folder_path = Path(nwb_folder_path)
-    nwb_folder_path.mkdir(parents=True, exist_ok=True)
+    subject_folder = nwb_folder_path / f"sub-{subject_id.replace('_', '-')}"
+    subject_folder.mkdir(parents=True, exist_ok=True)
+    nwbfile_path = subject_folder / f"sub-{subject_id}_ses-{session_id}.nwb"
+
+    if nwbfile_path.exists() and not overwrite:
+        print(f"NWB file already exists and overwrite is False. Skipping conversion: '{nwbfile_path}'")
+        return nwbfile_path
 
     source_data = dict()
     conversion_options = dict()
@@ -59,27 +99,41 @@ def session_to_nwb(
 
     converter = ArcBehaviorNWBConverter(source_data=source_data)
 
+    # Load the editable metadata YAML first so timezone and other session-level
+    # values are available before they are needed.
+    editable_metadata_path = Path(__file__).parent / "metadata.yaml"
+    editable_metadata = load_dict_from_file(editable_metadata_path)
+    timezone_str = editable_metadata.get("Session", {}).get("timezone", "Europe/London")
+
     # Add datetime to conversion
     metadata = converter.get_metadata()
     session_start_time = metadata["NWBFile"]["session_start_time"]
-    session_start_time = session_start_time.replace(tzinfo=ZoneInfo("Europe/London"))
+    session_start_time = session_start_time.replace(tzinfo=ZoneInfo(timezone_str))
     metadata["NWBFile"].update(session_start_time=session_start_time)
 
-    # Update default metadata with the editable in the corresponding yaml file
-    editable_metadata_path = Path(__file__).parent / "metadata.yaml"
-    editable_metadata = load_dict_from_file(editable_metadata_path)
+    # Merge YAML metadata over interface defaults.
+    # Optogenetics is extracted first and set directly: dict_deep_update treats duplicate
+    # values inside lists as a set union and collapses them (e.g. [473.0, 473.0] → [473.0]).
+    opto_meta = editable_metadata.pop("Optogenetics", None)
     metadata = dict_deep_update(metadata, editable_metadata)
-
-    file_path = Path(file_path)
-    file_name = file_path.stem  # data_@TaskSwitch6_Nuria_H7015_250516a
-    # extract data_@{protocol_name}_{experimenter}_{subject_id}_{session_id} pattern from file name
-    file_name = file_name.replace("data_@", "")  # Remove 'data_@' prefix
-    protocol_name, experimenter, subject_id, session_id = file_name.split("_")
+    if opto_meta is not None:
+        metadata["Optogenetics"] = opto_meta
 
     metadata["Subject"]["subject_id"] = subject_id
     metadata["NWBFile"]["session_id"] = session_id
 
-    nwbfile_path = nwb_folder_path / f"sub-{subject_id}_ses-{session_id}.nwb"
+    # Add per-subject metadata from rat_information.xlsx
+    rat_info = _load_rat_info()
+    if subject_id in rat_info.index:
+        row = rat_info.loc[subject_id]
+        dob = row["Date of Birth"]
+        metadata["Subject"]["date_of_birth"] = dob.to_pydatetime().replace(tzinfo=ZoneInfo(timezone_str))
+        sex_str = str(row["Sex"]).strip().lower()
+        metadata["Subject"]["sex"] = _SEX_MAP.get(sex_str, "U")
+    else:
+        print(
+            f"Warning: subject '{subject_id}' not found in rat_information.xlsx — subject metadata will be incomplete."
+        )
 
     # Run conversion
     converter.run_conversion(
@@ -96,12 +150,11 @@ if __name__ == "__main__":
 
     # Parameters for conversion
     behavior_file_path = '/Users/weian/data/Pagan/Protocol "TaskSwitch6"/data_@TaskSwitch6_Nuria_H7015_250516a.mat'
-    nwb_folder_path = "/Volumes/T9/data/Pagan/raw"
+    nwb_folder_path = "/Volumes/T9/data/Pagan_latest_data_share/nwbfiles"
 
     # Path to the YAML file containing task parameters and their descriptions
-    # This file should be generated from the MATLAB code files in the Protocol_code folder
-    # See utils/notes.md for instructions on how to generate this file
-    yaml_file_path = Path('/Users/weian/data/Pagan/Protocol "TaskSwitch6"/Protocol_code') / "task_switch6_params.yaml"
+    # The canonical copy lives in the conversion repo at arc_behavior/task_switch6_params.yaml
+    yaml_file_path = _TASK_PARAMS_YAML_PATH
 
     stub_test = False
     overwrite = True

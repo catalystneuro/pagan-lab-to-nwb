@@ -1,0 +1,8 @@
+[project]
+name = "pagan-lab-to-nwb-spyglass"
+version = "0.0.1"
+requires-python = ">=3.10,<3.13"
+
+dependencies = [
+  "spyglass-neuro @ git+https://github.com/CBroz1/spyglass.git@iti",
+]

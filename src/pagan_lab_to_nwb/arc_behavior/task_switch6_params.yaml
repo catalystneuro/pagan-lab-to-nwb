@@ -1,0 +1,417 @@
+ProtocolsSection:
+  n_done_trials:
+    description: The number of done trials.
+  n_started_trials:
+    description: The number of started trials.
+  n_completed_trials:
+    description: The number of completed trials.
+SoundInterface:
+  Tau:
+    description: Tau in s
+  FreqS:
+    description: The rate of stereo clicks
+  Cntrst:
+    description: Total contrast of Freq1 and Freq2; (C1+C2)
+  Gap:
+    description: Gap between 1st and second part of sweep in seconds.
+  Stereo_1st:
+    description: Forces first click to be stereo
+  WNP:
+    description: Percent sound power that is white noise
+  CRatio:
+    description: log of the ratio of the contrasts; log(C1/C2)
+  Loop:
+    description: If this is selected sound will play until an explicit sound off.  Make
+      sure to test sound for artifacts at loop boundary
+  Dur1:
+    description: duration 1 in seconds
+  Dur2:
+    description: duration 2 in seconds
+  Width:
+    description: click width in milliseconds
+  Sigma:
+    description: stdev of gaussians around Freq1 and Freq2 in frequency space
+  FMAmp:
+    description: FM modulation ampl, in Hz
+  Freq1:
+    description: frequency 1 in Hz
+  Vol2:
+    description: final Vol in WhiteNoiseRamp
+  Freq2:
+    description: frequency 2 in Hz
+  FMFreq:
+    description: FM modulation freq in Hz
+  Vol:
+    description: volume. 0-1
+  Bal:
+    description: balance. -1=Left, 0=center, 1=right
+  Left_Click_Times:
+    description: LCT
+  Right_Click_Times:
+    description: RCT
+  SndsMenu:
+    description: SoundFile
+  Collisions:
+    description: Prevents clicks from superimposing
+  ForceCount:
+    description: Allows frequencys to be interpreted as click counts
+  Play:
+    description: Play
+  Stop:
+    description: Stop
+HistorySection:
+  correct_coherent:
+    description: Fraction of correct responses on coherent trials (location and frequency
+      evidence consistent), computed as a running average over the session.
+  correct_incoherent:
+    description: Fraction of correct responses on incoherent trials (location and
+      frequency evidence conflict), computed as a running average over the session.
+  left_correct:
+    description: Fraction of correct responses on trials where the correct side was
+      left, computed as a running average over the session.
+  right_correct:
+    description: Fraction of correct responses on trials where the correct side was
+      right, computed as a running average over the session.
+  dir_correct:
+    description: Fraction of correct responses on Direction (LOC) context trials,
+      computed as a running average over the session.
+  freq_correct:
+    description: Fraction of correct responses on Frequency (FRQ) context trials,
+      computed as a running average over the session.
+  total_correct:
+    description: Overall fraction of correct responses (excluding violation trials),
+      computed as a running average over the session.
+  percent_violations:
+    description: Fraction of trials that were nose-in-center (NIC) violations, computed
+      as a running average over the session.
+  result_history:
+    description: "Trial outcome code for each trial in the session. Values: 1 = correct\
+      \ (hit_state reached); 2 = error (error_state reached); 3 = nose-in-center\
+      \ (NIC) violation; 4 = timeout violation; 5 = error-then-correct (wrong side\
+      \ chosen first, then correct side in forgiveness mode); 6 = error-then-error\
+      \ (wrong side chosen twice in forgiveness mode)."
+  hit_history:
+    description: "Binary trial outcome per trial, ignoring violations. Values: 1 =\
+      \ correct (result=1); 0 = error or error-forgiveness trial (result=2, 5, or\
+      \ 6); NaN = violation trial (NIC or timeout, result=3 or 4). Used to compute\
+      \ performance metrics such as total_correct, left_correct, dir_correct."
+  side_history:
+    description: "Stimulus-determined correct response side for each trial. Values:\
+      \ 'l' = correct side was left; 'r' = correct side was right. This reflects\
+      \ which side had the greater total number of pulses in the LOC context, or which\
+      \ frequency dominated in the FRQ context."
+  task_history:
+    description: "Task context for each trial. Values: 'd' = Direction/LOC (location)\
+      \ context, rat must respond based on which side received more pulses; 'f' =\
+      \ Frequency/FRQ context, rat must respond based on which frequency (high/low)\
+      \ dominated. Context alternates in blocks of at least 30 trials."
+  incoh_history:
+    description: "Whether each trial was incoherent (1) or coherent (0). Coherent\
+      \ trials (0): location and frequency evidence are consistent (e.g., more right-side\
+      \ pulses and more high-frequency pulses simultaneously). Incoherent trials (1):\
+      \ location and frequency evidence conflict. These trials test the rat's ability\
+      \ to ignore the irrelevant stimulus feature."
+  gammadir_history:
+    description: Signed strength of the location (direction) evidence for each trial
+      (ThisGamma_dir). Positive values indicate more right-side pulses (go-right evidence);
+      negative values indicate more left-side pulses (go-left evidence). The magnitude
+      reflects the difference in right-vs-left pulse rates. In the LOC context this
+      is the relevant evidence; in the FRQ context it is irrelevant.
+  gammafreq_history:
+    description: Signed strength of the frequency evidence for each trial (ThisGamma_freq).
+      Positive values indicate more high-frequency pulses; negative values indicate
+      more low-frequency pulses. The magnitude reflects the difference in high-vs-low
+      pulse rates. In the FRQ context this is the relevant evidence; in the LOC context
+      it is irrelevant.
+  hit_history_task:
+    description: "Binary trial outcomes within the current task block, reset at each\
+      \ context switch. Values: 1 = correct; 0 = error; NaN = violation. Used to\
+      \ compute exponentially weighted running performance within the current block\
+      \ (total_correct_task), which drives automatic context switching."
+  incoh_history_task:
+    description: "Whether each trial in the current task block was incoherent (1)\
+      \ or coherent (0), NaN for violations. Resets at each context switch. Used\
+      \ to compute block-level performance separately for coherent and incoherent\
+      \ trials (total_correct_coherent_task, total_correct_incoherent_task)."
+  quadrant_history:
+    description: "Stimulus quadrant for each trial, encoding the combination of direction\
+      \ and frequency evidence signs. The quadrant is determined by the signs of\
+      \ ThisGamma_dir and ThisGamma_freq: quadrant 1 = right/high, 2 = left/high,\
+      \ 3 = left/low, 4 = right/low. Coherent trials have quadrant 1 or 3; incoherent\
+      \ trials have quadrant 2 or 4 (evidence signs conflict)."
+  left_laser_history:
+    description: "Per-trial record of left-hemisphere laser stimulation state. Values:\
+      \ 1 = laser was on for this trial (left hemisphere stimulated); 0 = laser off.\
+      \ ⚠️ Needs lab confirmation — exact encoding (on/off vs power level) not verified."
+  right_laser_history:
+    description: "Per-trial record of right-hemisphere laser stimulation state. Values:\
+      \ 1 = laser was on for this trial (right hemisphere stimulated); 0 = laser\
+      \ off. ⚠️ Needs lab confirmation — exact encoding (on/off vs power level) not verified."
+RunningSection:
+  RunButton:
+    description: Click to Run
+  UpdatePeriod:
+    description: minimum time (ms) between update calls when running
+SavingSection:
+  loadsets:
+    description: Load Settings
+  savesets:
+    description: Save Settings
+  loaddata:
+    description: Load Data
+  savedata:
+    description: Save Data
+  interactive_by_default:
+    description: When this is "interactive",\n
+SMA1: {}
+StimulusSection:
+  water_increase_multiplier:
+    description: water increase multiplier as a function of n_done_trials
+  WI_base:
+    description: water increase base
+  WI_ratio:
+    description: water increase per trial
+  WI_max:
+    description: water increase max
+  water_increase_toggle:
+    description: If on water increase is on
+  TimingShow:
+    description: Show/Hide Timing panel
+  timeout_delay:
+    description: Delay after timeout at spoke, follows new trial
+  reward_delay:
+    description: Delay between side poke and reward delivery
+  wait_for_spoke_timeout:
+    description: Time after NIC to wait for a side poke
+  nic_delay:
+    description: Delay after NIC violation, follows new trial
+  settling_time:
+    description: Time in NIC before starting stimulus
+  wait_for_cpoke_timeout:
+    description: Timeout waiting for cpoke
+  SoundsShow:
+    description: Show/Hide Sounds panel
+  StimuluShow:
+    description: Show/Hide Stimulus panel
+  bup_width:
+    description: the bup width in units of msec
+  bup_ramp:
+    description: the duration in units of msec of the upwards and downwards volume
+      ramps for individual bups
+  total_rate:
+    description: the sum of left and right bup rates
+  freq_lo:
+    description: low frequency (Hz)
+  freq_hi:
+    description: high frequency (Hz)
+  vol_low_freq:
+    description: volume multiplier for clicks at low frequency
+  vol_hi_freq:
+    description: volume multiplier for clicks at high frequency
+  vol:
+    description: volume multiplier for all sounds in the protocol
+  task_switch_min_perf:
+    description: Minimum performance to allow switching
+  task_switch_mintrials:
+    description: Minimum number of trials before switching
+  task_switch_auto:
+    description: If on, switches automatically between tasks
+  randomize_first_task:
+    description: If on, picks randomly the first task
+  repeat_same_stimuli:
+    description: If on, fixes stimuli throughout session
+  exist_incoherent:
+    description: 1 if incoherent trials can be generated under current parameters
+  nTrials_incoh_task:
+    description: nTri incoh
+  total_correct_incoherent_task:
+    description: '%hit incoh'
+  nTrials_coh_task:
+    description: nTri coh
+  total_correct_coherent_task:
+    description: '%hit coh'
+  nTrials_task:
+    description: nTri all
+  total_correct_task:
+    description: '%hit all'
+  ThisTask:
+    description: the task of the present trial
+  Ab_Tau:
+    description: Number of trials back over which to compute antibias
+  Ab_Beta:
+    description: antibias strength
+  antibias_type:
+    description: antibias type (depends on exist_incoherent)
+  antibias_toggle:
+    description: If on antibias is on
+  stimulus_mixing_freq:
+    description: '%mixing freq'
+  stimulus_mixing_dir:
+    description: '%mixing dir'
+  wait_delay_freq:
+    description: wait delay
+  helper_lights_freq:
+    description: If on (black), LED lights help indicate what to do; if off (brown),
+      no helper LED lights
+  error_forgiveness_freq:
+    description: If on (black), start new trial upon wrong side choice; if off (brown),
+      can choose again
+  nose_in_center:
+    description: min NIC
+  durations_dir:
+    description: possible stimulus durations
+  gamma_freq_values_dir:
+    description: possible gamma_freq values
+  gamma_dir_values_dir:
+    description: possible gamma_dir values
+  durations_freq:
+    description: possible stimulus durations
+  gamma_freq_values_freq:
+    description: possible gamma_freq values
+  gamma_dir_values_freq:
+    description: possible gamma_dir values
+  draw:
+    description: draw
+  ThisSide:
+    description: Side
+  ThisQuadrant:
+    description: Quad
+  ThisDuration:
+    description: Dur
+  ThisGamma_dir:
+    description: Gdir
+  ThisGamma_freq:
+    description: Gfreq
+WaterValvesSection:
+  WaterShow:
+    description: Show/Hide Water Valves panel
+  Left_volume:
+    description: Left uL
+  LeftWValveTime:
+    description: Lt Wtr time
+  Center_volume:
+    description: Center uL
+  CenterWValveTime:
+    description: Ct Wtr time
+  Right_volume:
+    description: Right uL
+  RightWValveTime:
+    description: Rt Wtr time
+  Streak_base:
+    description: Streak Base
+  Streak_max:
+    description: Max Streak Length
+TaskSwitch6: {}
+TrainingSection:
+  stage_switch_auto:
+    description: If on, switches automatically between training stages
+  nDays_stage:
+    description: nDays
+  nTrials_stage:
+    description: nTrials
+  stage_explanation:
+    description: Description of current stage
+  training_stage:
+    description: the current training stage
+  update_active_stage:
+    description: OK
+CommentsSection:
+  CommentsShow:
+    description: Show/Hide Comments panel
+  comments:
+    description: Detailed Comments (e.g., day-by-day)
+  comments_on_each_trial:
+    description: Comments saved on each trial (empty by default to avoid memory hogging)
+  overall_comments:
+    description: Overall Comments
+  clean_lines:
+    description: \nMake sure no lines are greater than 80 chars
+OptoSection:
+  opto_active:
+    description: If on, sends opto pulses to cerebro
+  nTrials_opto_0:
+    description: T
+  percent_violations_opto_0:
+    description: V
+  left_correct_opto_0:
+    description: L
+  right_correct_opto_0:
+    description: R
+  nTrials_opto_bi:
+    description: T
+  percent_violations_opto_bi:
+    description: V
+  left_correct_opto_bi:
+    description: L
+  right_correct_opto_bi:
+    description: R
+  nTrials_opto_right:
+    description: T
+  percent_violations_opto_right:
+    description: V
+  left_correct_opto_right:
+    description: L
+  right_correct_opto_right:
+    description: R
+  nTrials_opto_left:
+    description: T
+  percent_violations_opto_left:
+    description: V
+  left_correct_opto_left:
+    description: L
+  right_correct_opto_left:
+    description: R
+  opto_left_power:
+    description: L power
+  opto_right_power:
+    description: R power
+  cere2:
+    description: R power
+  cere3:
+    description: R power
+  cere4:
+    description: R power
+  cere5:
+    description: R power
+  opto_stop_ref:
+    description: opto stop ref
+  delay_stop:
+    description: delay stop
+  opto_start_ref:
+    description: opto start ref
+  delay_start:
+    description: delay start
+  opto_setup:
+    description: Show/Hide Opto setup panel
+  cerebro_stop:
+    description: stop
+  cerebro_trigger:
+    description: trigger
+  cerebro_send_waveform:
+    description: send wave
+  acere2:
+    description: R power
+  acere3:
+    description: R power
+  acere4:
+    description: R power
+  acere5:
+    description: R power
+  cerebro_send_power:
+    description: send power
+  aopto_left_power:
+    description: L power
+  aopto_right_power:
+    description: R power
+  cerebro_connect:
+    description: connect
+  test_implant:
+    description: TEST IMPLANT HERE
+  opto_connected:
+    description: If 1, we are connected to cerebro
+  opto_type:
+    description: the current type of opto
+  max_left_opto_power:
+    description: L power
+  max_right_opto_power:
+    description: R power
