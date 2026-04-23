@@ -1,14 +1,4 @@
-"""Spyglass-compatible video interface using ndx-franklab-novela CameraDevice.
-
-Differences from NeuroConv's VideoInterface:
-- Uses ``CameraDevice`` (ndx-franklab-novela) instead of a plain ``Device``.
-- Places ``ImageSeries`` in the ``behavior`` processing module wrapped in
-  ``BehavioralEvents`` (required by Spyglass ``VideoFile.make()``).
-- Accepts real per-frame timestamps; falls back to uniform timestamps from a
-  nominal frame rate when real sync data is unavailable (see open_questions.md Q3 / Q10).
-- ``camera_name`` must match an entry in the Spyglass ``sgc.CameraDevice`` table
-  (see open_questions.md Q11).
-"""
+"""Spyglass-compatible video interface using ndx-franklab-novela CameraDevice."""
 
 from pathlib import Path
 
@@ -22,11 +12,6 @@ from neuroconv.basedatainterface import BaseDataInterface
 from neuroconv.datainterfaces.behavior.video.video_utils import get_video_timestamps
 from neuroconv.tools import get_module
 from neuroconv.utils import DeepDict, dict_deep_update, load_dict_from_file
-
-# Nominal frame rate used to generate placeholder timestamps when real sync
-# data is unavailable.  Replace with actual frame timestamps once confirmed
-# (see open_questions.md Q3 / Q10).
-_NOMINAL_FPS = 19.98
 
 
 class SpyglassVideoInterface(BaseDataInterface):
