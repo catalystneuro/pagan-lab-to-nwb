@@ -1,0 +1,116 @@
+NWBFile:
+  lab: Pagan
+  institution: University of Edinburgh
+  # TODO: confirm related publication DOI once published
+  # related_publications:
+  #   - "doi:10.xxxx/xxxxx"
+  experiment_description: >
+    Electrophysiology recordings during a task-switching auditory decision-making task
+    (BControl protocol) in Long-Evans rats. Tetrode arrays were implanted and neural
+    activity was recorded using SpikeGadgets. Spike sorting was performed offline.
+
+Subject:
+  species: Rattus norvegicus
+  sex: M
+  strain: Long Evans
+
+Ecephys:
+  # DataAcqDevice (ndx-franklab-novela) — required for Spyglass ingestion.
+  # Replaces the standard PyNWB Device. Spyglass DataAcquisitionDevice.make() reads this.
+  DataAcqDevice:
+    name: HH128
+    system: SpikeGadgets
+    amplifier: Horizontal Headstage 128-Channel Datalogger  # integrated in HH128 (confirmed by lab)
+    adc_circuit: Horizontal Headstage 128-Channel Datalogger  # integrated in HH128 (confirmed by lab)
+    description: >
+      Horizontal Headstage 128-Channel Datalogger (HH128) by SpikeGadgets.
+      Amplifier and ADC circuit are integrated inside the same Datalogger unit.
+      Used for tetrode array recordings (Pagan Lab, University of Edinburgh).
+    manufacturer: SpikeGadgets
+
+  # Units table description — shown in NWB viewers and on DANDI.
+  # Edit this to describe what the units represent for this experiment.
+  Units:
+    description: >
+      Spike-sorted units recorded from a 32-tetrode SpikeGadgets array implanted in
+      Long-Evans rats during an auditory task-switching paradigm (BControl).
+      Spike sorting was performed offline using the Pagan Lab pipeline.
+      Each unit includes spike times, mean waveform, waveform SD, and tetrode ID.
+
+  # Probe (ndx-franklab-novela) — one probe device for the whole tetrode array.
+  # Spyglass Probe.make() reads this. NwbElectrodeGroup.device must point to this.
+  # TODO (open_questions.md Q8): confirm contact_size (wire diameter in mm).
+  Probe:
+    name: tetrode_array
+    probe_type: tetrode
+    units: mm
+    probe_description: "32-tetrode array (SpikeGadgets, Pagan Lab)"
+    contact_size: .nan          # TODO: confirm with lab (open_questions.md Q8)
+
+# ── Behavior tables (ndx-structured-behavior) ─────────────────────────────────
+Behavior:
+  Device:
+    name: BControl
+    manufacturer: Brody Lab, Princeton University
+  StateTypesTable:
+    description: Contains the name of the states in the task.
+  StatesTable:
+    description: Contains the start and stop times of each state in the task.
+  EventTypesTable:
+    description: Contains the name of the events in the task.
+  EventsTable:
+    description: Contains the start and stop times of each active event (e.g. poke) in the task.
+  ActionTypesTable:
+    description: Contains the name of the actions in the task.
+  ActionsTable:
+    description: Contains the onset times of the task output actions.
+  TaskArgumentsTable:
+    description: Contains the task arguments for the task.
+  TrialsTable:
+    description: Contains the start and stop times of each trial in the task.
+    # Ragged pulse-time columns: times relative to cpoke onset, one list per trial.
+    # Add cpoke_start_time to convert to absolute session time.
+    pulse_columns:
+      cpoke_start_time: >-
+        Absolute time (seconds from session start) when the rat entered the centre port
+        (cpoke onset). NaN for trials where the rat did not poke (error/invalid trials).
+        Used to convert relative pulse timestamps in left_hi/right_hi/left_lo/right_lo
+        to absolute times.
+      left_hi: >-
+        Times of left-speaker, high-frequency pulses in seconds relative to cpoke onset
+        (centre-port entry). Add cpoke_start_time to convert to absolute session time.
+        Empty when no pulses of this type were generated.
+      right_hi: >-
+        Times of right-speaker, high-frequency pulses in seconds relative to cpoke onset.
+        Add cpoke_start_time to convert to absolute session time.
+      left_lo: >-
+        Times of left-speaker, low-frequency pulses in seconds relative to cpoke onset.
+        Add cpoke_start_time to convert to absolute session time.
+      right_lo: >-
+        Times of right-speaker, low-frequency pulses in seconds relative to cpoke onset.
+        Add cpoke_start_time to convert to absolute session time.
+    columns:
+      - name: crosstalk_dir
+        description: The ratio to which the pulse is played from the left or right speaker. A value of 1 means the pulse is played only from the right side, and a value of 0 means the pulse is played equally from both speakers.
+      - name: crosstalk_freq
+        description: The ratio to which the pulses are being modulated in frequency.
+      - name: bup_width
+        description: The duration of a single pulse in milliseconds.
+      - name: bup_ramp
+        description: The duration of the ramp of a single pulse in milliseconds.
+      - name: vol_low
+        description: The multiplier of the volume of the low frequency tone.
+      - name: vol_hi
+        description: The multiplier of the volume of the high frequency tone.
+      - name: vol
+        description: The overall volume multiplier of the sound stimulus.
+      - name: gamma_dir
+        description: Log ratio of average right vs. left pulse rates per second; zero means equal, positive means more pulses come from the right speaker, negative means more left.
+      - name: gamma_freq
+        description: Log ratio of average high vs. low frequency pulses per second; zero means equal, positive means more high frequency pulses, negative means more low frequency pulses.
+      - name: duration
+        description: The duration of the sound stimulus in seconds.
+      - name: freq_lo
+        description: The frequency of the low frequency pulse in Herz.
+      - name: freq_hi
+        description: The frequency of the high frequency pulse in Herz.
