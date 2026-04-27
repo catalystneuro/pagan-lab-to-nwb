@@ -1,5 +1,5 @@
-# Hardware and units metadata for SpikesMatInterface (ndx-franklab-novela types).
-# Loaded by SpikesMatInterface.get_metadata() as the single source of truth.
+# Hardware and units metadata for SpikeSortingMatInterface (ndx-franklab-novela types).
+# Loaded by SpikeSortingMatInterface.get_metadata() as the single source of truth.
 # arc_ecephys/metadata.yaml may override individual fields via dict_deep_update()
 # in convert_session.py if session-specific values differ.
 #

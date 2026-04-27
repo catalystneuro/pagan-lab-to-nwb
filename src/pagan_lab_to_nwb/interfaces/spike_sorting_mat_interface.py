@@ -29,7 +29,7 @@ from neuroconv.utils import (
 )
 
 
-class SpikesMatInterface(BaseDataInterface):
+class SpikeSortingMatInterface(BaseDataInterface):
     """Interface for spike-sorted MATLAB files produced by the Pagan Lab pipeline.
 
     Reads ``spikes_@*.mat`` files (HDF5 / MATLAB v7.3 format) containing:
@@ -44,7 +44,7 @@ class SpikesMatInterface(BaseDataInterface):
     - ``nwbfile.units``  — spike times, waveforms, and tetrode ID per unit
     """
 
-    display_name = "Pagan Lab Spikes MAT"
+    display_name = "Pagan Lab Spike Sorting MAT"
     keywords = ("extracellular electrophysiology", "spike sorting", "tetrode", "units")
     associated_suffixes = (".mat",)
     info = "Interface for spike-sorted tetrode data from the Pagan Lab MATLAB pipeline."
@@ -172,7 +172,7 @@ class SpikesMatInterface(BaseDataInterface):
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
-        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_spikes_mat_metadata.yaml"
+        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_spike_sorting_mat_metadata.yaml"
         editable_metadata = load_dict_from_file(editable_metadata_path)
         metadata = dict_deep_update(metadata, editable_metadata)
         return metadata
@@ -356,7 +356,7 @@ class SpikesMatInterface(BaseDataInterface):
             )
             tasks_module.add(task_table)
 
-        # 1. Max spike time across all units — actual end of ephys recording.
+        # Max spike time across all units — actual end of ephys recording.
         # goodp is intentionally not used here: it marks the validated subset of the
         # recording, not the full session duration.
         max_spike = max(
