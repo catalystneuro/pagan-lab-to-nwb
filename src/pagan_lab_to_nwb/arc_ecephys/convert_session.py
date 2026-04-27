@@ -105,8 +105,8 @@ def session_to_nwb(
         conversion_options["SpikesMat"] = dict(stub_test=stub_test, protocol=protocol_name)
 
     if dati_file_path is not None:
-        source_data["DatiMat"] = dict(file_path=Path(dati_file_path))
-        conversion_options["DatiMat"] = dict(stub_test=stub_test)
+        source_data["ProcessedTrials"] = dict(file_path=Path(dati_file_path))
+        conversion_options["ProcessedTrials"] = dict(stub_test=stub_test)
 
     if video_file_path is not None:
         source_data["Video"] = dict(file_path=video_file_path)

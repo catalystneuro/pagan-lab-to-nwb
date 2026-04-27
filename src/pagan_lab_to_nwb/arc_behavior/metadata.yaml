@@ -7,7 +7,7 @@
 # They live in src/pagan_lab_to_nwb/metadata/ and are loaded automatically
 # by each interface's get_metadata():
 #   _bcontrol_metadata.yaml  →  Behavior tables + Optogenetics (BControlBehaviorInterface)
-#   _dati_mat_metadata.yaml  →  processed_trials columns (DatiMatInterface)
+#   _processed_trials_metadata.yaml  →  processed_trials columns (ProcessedTrialsInterface)
 #
 # Per-subject sex and date_of_birth are injected from rat_information.xlsx
 # by convert_session.py and do not need to be set here.

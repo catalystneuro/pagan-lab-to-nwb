@@ -1,4 +1,4 @@
-"""Custom Spyglass/DataJoint table for DatiMat processed_trials data.
+"""Custom Spyglass/DataJoint table for ProcessedTrialsInterface processed_trials data.
 
 Follows the kind-lab-to-nwb pattern: stores the NWB object_id of the
 processed_trials TimeIntervals table rather than duplicating all columns
@@ -27,7 +27,7 @@ schema = dj.schema("behavior_pagan")
 
 @schema
 class ProcessedTrials(SpyglassMixin, dj.Manual):
-    """Pointer to the processed_trials TimeIntervals table from DatiMatInterface.
+    """Pointer to the processed_trials TimeIntervals table from ProcessedTrialsInterface.
 
     Stores the NWB object_id of nwbfile.processing["behavior"]["processed_trials"].
     Use fetch_nwb() to resolve the object_id back to the TimeIntervals object,

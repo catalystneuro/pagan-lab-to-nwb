@@ -7,7 +7,7 @@
 # by each interface's get_metadata():
 #   _bcontrol_metadata.yaml   →  Behavior tables + Optogenetics (BControlBehaviorInterface)
 #   _spikes_mat_metadata.yaml →  Ecephys hardware (DataAcqDevice, Probe, Units) (SpikesMatInterface)
-#   _dati_mat_metadata.yaml   →  processed_trials columns (DatiMatInterface)
+#   _processed_trials_metadata.yaml   →  processed_trials columns (ProcessedTrialsInterface)
 #   _video_metadata.yaml      →  CameraDevice (SpyglassVideoInterface)
 #
 # Per-subject date_of_birth is injected from rat_information.xlsx by convert_session.py.

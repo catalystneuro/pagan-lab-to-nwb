@@ -1,9 +1,11 @@
-"""NWBConverter for the arc_ecephys pipeline (behavior + spikes + dati + video)."""
+"""NWBConverter for the arc_ecephys pipeline (behavior + spikes + processed trials + video)."""
 
 from neuroconv import NWBConverter
 from pagan_lab_to_nwb.interfaces import BControlBehaviorInterface
-from pagan_lab_to_nwb.interfaces._dati_mat import DatiMatInterface
 from pagan_lab_to_nwb.interfaces._spikes_mat import SpikesMatInterface
+from pagan_lab_to_nwb.interfaces.processed_trials_interface import (
+    ProcessedTrialsInterface,
+)
 from pagan_lab_to_nwb.interfaces.spyglass_video_interface import SpyglassVideoInterface
 
 
@@ -13,10 +15,10 @@ class ArcEcephysNWBConverter(NWBConverter):
     Data streams and interface order (order matters — each interface may depend on
     objects created by a preceding one):
 
-      1. BControlBehavior  — creates nwbfile.trials (required by DatiMat)
+      1. BControlBehavior  — creates nwbfile.trials
       2. SpikesMat         — creates nwbfile.units, electrodes, Probe + DataAcqDevice
                              hierarchy, and behavior processing module
-      3. DatiMat           — adds columns to nwbfile.trials (requires trials to exist)
+      3. ProcessedTrials   — adds processed_trials TimeIntervals to behavior module
       4. Video             — adds CameraDevice + ImageSeries in behavior module
                              (Spyglass VideoFile.make() requires CameraDevice)
 
@@ -37,6 +39,6 @@ class ArcEcephysNWBConverter(NWBConverter):
     data_interface_classes = dict(
         Behavior=BControlBehaviorInterface,
         Video=SpyglassVideoInterface,
-        DatiMat=DatiMatInterface,
+        ProcessedTrials=ProcessedTrialsInterface,
         SpikesMat=SpikesMatInterface,
     )

@@ -1,4 +1,4 @@
-"""Interface for reading processed trial/neural data from dati_*.mat files."""
+"""Interface for writing processed trial data from dati_*.mat files to NWB TimeIntervals."""
 
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ from neuroconv.utils import (
 )
 
 # Row-index → NWB column name for the 7-row ``tim`` matrix (confirmed by lab, 2026-04-21).
-# Order is fixed by the mat file format; descriptions live in metadata.yaml.
+# Order is fixed by the mat file format; descriptions live in _processed_trials_metadata.yaml.
 _TIM_COLUMN_MAP = {
     0: "previous_trial_end",
     1: "trial_ready",  # used as start_time for processed trial intervals (10 ms offset from BControl clock)
@@ -30,8 +30,8 @@ _TIM_COLUMN_MAP = {
 }
 
 
-class DatiMatInterface(BaseDataInterface):
-    """Interface for the Pagan Lab processed trial/neural data file (``dati_*.mat``).
+class ProcessedTrialsInterface(BaseDataInterface):
+    """Interface for the Pagan Lab processed trial data file (``dati_*.mat``).
 
     Reads the MATLAB v5 file containing:
     - per-trial behavioral variables (choice, hits, task, side, gdir, gfreq, nta, stim)
@@ -39,16 +39,16 @@ class DatiMatInterface(BaseDataInterface):
 
     Writes to NWB:
     - ``processing["behavior"]["processed_trials"]`` — a ``TimeIntervals`` table containing
-      all dati behavioral variables (choice, hits, nta, correct_side, task_context,
+      all behavioral variables (choice, hits, nta, correct_side, task_context,
       gdir, gfreq, all 7 tim event timestamps, stim_params).  start_time/stop_time
       are set from tim rows 1 and 6 (dati clock; ~10 ms offset from BControl clock).
 
     """
 
-    display_name = "Pagan Lab Dati MAT"
+    display_name = "Pagan Lab Processed Trials"
     keywords = ("behavior", "trials")
     associated_suffixes = (".mat",)
-    info = "Interface for processed trial and neural response data (dati_*.mat)."
+    info = "Interface for processed trial data from dati_*.mat files (Pagan Lab pipeline)."
 
     @validate_call
     def __init__(self, file_path: Path, verbose: bool = False):
@@ -75,7 +75,7 @@ class DatiMatInterface(BaseDataInterface):
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
 
-        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_dati_mat_metadata.yaml"
+        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_processed_trials_metadata.yaml"
         editable_metadata = load_dict_from_file(editable_metadata_path)
         metadata = dict_deep_update(metadata, editable_metadata)
 
@@ -91,12 +91,12 @@ class DatiMatInterface(BaseDataInterface):
         d = self._dati
 
         if "tim" not in d:
-            warn("DatiMatInterface: 'tim' not found in dati file. Skipping.")
+            warn("ProcessedTrialsInterface: 'tim' not found in dati file. Skipping.")
             return
 
         tim = np.asarray(d["tim"])  # expected shape: (7, n_trials)
         if tim.ndim != 2 or tim.shape[0] < 7:
-            warn(f"DatiMatInterface: unexpected 'tim' shape {tim.shape}. Skipping.")
+            warn(f"ProcessedTrialsInterface: unexpected 'tim' shape {tim.shape}. Skipping.")
             return
 
         n = tim.shape[1]
@@ -104,7 +104,7 @@ class DatiMatInterface(BaseDataInterface):
         def _to_float_list(arr):
             arr = np.asarray(arr, dtype=float).flatten()
             if len(arr) != n:
-                warn(f"DatiMatInterface: field length {len(arr)} != {n}. Truncating/padding.")
+                warn(f"ProcessedTrialsInterface: field length {len(arr)} != {n}. Truncating/padding.")
             if len(arr) >= n:
                 return arr[:n].tolist()
             padded = np.full(n, np.nan)
@@ -114,7 +114,7 @@ class DatiMatInterface(BaseDataInterface):
         def _to_str_list(s):
             chars = list(str(s)) if isinstance(s, str) else [str(x) for x in np.asarray(s).flatten()]
             if len(chars) != n:
-                warn(f"DatiMatInterface: string field length {len(chars)} != {n}. Truncating/padding.")
+                warn(f"ProcessedTrialsInterface: string field length {len(chars)} != {n}. Truncating/padding.")
             if len(chars) >= n:
                 return chars[:n]
             return chars + [""] * (n - len(chars))
@@ -184,7 +184,7 @@ class DatiMatInterface(BaseDataInterface):
             if len(stim) > n:
                 stim = stim[:n]
             elif len(stim) < n:
-                warn(f"DatiMatInterface: 'stim' length {len(stim)} != {n}. Padding.")
+                warn(f"ProcessedTrialsInterface: 'stim' length {len(stim)} != {n}. Padding.")
                 stim = stim + [{}] * (n - len(stim))
             stim_json = []
             for entry in stim:
