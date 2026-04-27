@@ -6,7 +6,7 @@
 # They live in src/pagan_lab_to_nwb/metadata/ and are loaded automatically
 # by each interface's get_metadata():
 #   _bcontrol_metadata.yaml   →  Behavior tables + Optogenetics (BControlBehaviorInterface)
-#   _spikes_mat_metadata.yaml →  Ecephys hardware (DataAcqDevice, Probe, Units) (SpikesMatInterface)
+#   _spike_sorting_mat_metadata.yaml →  Ecephys hardware (DataAcqDevice, Probe, Units) (SpikeSortingMatInterface)
 #   _processed_trials_metadata.yaml   →  processed_trials columns (ProcessedTrialsInterface)
 #   _video_metadata.yaml      →  CameraDevice (SpyglassVideoInterface)
 #

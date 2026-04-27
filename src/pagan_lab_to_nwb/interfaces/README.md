@@ -15,8 +15,8 @@ Edit these files to change device specs, table descriptions, or column descripti
 | YAML file | Interface | Contains |
 |---|---|---|
 | `_bcontrol_metadata.yaml` | `BControlBehaviorInterface` | Behavior table descriptions, BControl device, Optogenetics hardware |
-| `_spikes_mat_metadata.yaml` | `SpikesMatInterface` | DataAcqDevice (HH128), Probe, Units description |
-| `_dati_mat_metadata.yaml` | `DatiMatInterface` | processed_trials column descriptions |
+| `_spike_sorting_mat_metadata.yaml` | `SpikeSortingMatInterface` | DataAcqDevice (HH128), Probe, Units description |
+| `_processed_trials_metadata.yaml` | `ProcessedTrialsInterface` | processed_trials column descriptions |
 | `_video_metadata.yaml` | `SpyglassVideoInterface` | CameraDevice specs |
 
 **Layer 2 — Converter YAML (session/experiment-level overrides)**

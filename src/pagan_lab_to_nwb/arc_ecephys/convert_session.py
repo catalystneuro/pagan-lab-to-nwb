@@ -101,8 +101,8 @@ def session_to_nwb(
         conversion_options["Behavior"]["arguments_metadata"] = arguments_metadata
 
     if spikes_file_path is not None:
-        source_data["SpikesMat"] = dict(file_path=Path(spikes_file_path))
-        conversion_options["SpikesMat"] = dict(stub_test=stub_test, protocol=protocol_name)
+        source_data["SpikeSorting"] = dict(file_path=Path(spikes_file_path))
+        conversion_options["SpikeSorting"] = dict(stub_test=stub_test, protocol=protocol_name)
 
     if dati_file_path is not None:
         source_data["ProcessedTrials"] = dict(file_path=Path(dati_file_path))
