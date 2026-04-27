@@ -52,6 +52,10 @@ from spyglass.spikesorting.analysis.v1.unit_annotation import UnitAnnotation
 from spyglass.spikesorting.spikesorting_merge import SpikeSortingOutput
 from spyglass.utils.nwb_helper_fn import get_nwb_copy_filename, get_nwb_file
 
+from pagan_lab_to_nwb.spyglass_extensions.spyglass_processed_trials_table import (
+    ProcessedTrials,
+)
+
 SPYGLASS_RAW_DIR = Path(raw_dir)
 
 
@@ -164,6 +168,16 @@ def print_tables(nwbfile_path: Path):
         arguments = (TaskRecordingTypes.Arguments() & nwb_dict).fetch(as_dict=True)
         print(pd.DataFrame(arguments).to_markdown(), file=f)
 
+        n_pt = len(ProcessedTrials() & nwb_dict)
+        print(f"\n=== ProcessedTrials ({n_pt} rows) ===", file=f)
+        if n_pt > 0:
+            pt_rows = (ProcessedTrials() & nwb_dict).fetch(as_dict=True, limit=5)
+            print(pd.DataFrame(pt_rows).to_markdown(), file=f)
+            if n_pt > 5:
+                print(f"  ... ({n_pt - 5} more rows)", file=f)
+        else:
+            print("  (no processed trials data for this session)", file=f)
+
     print(f"Table summary written to {out_path}")
 
 
@@ -192,6 +206,24 @@ def test_task_recording_types(nwbfile_path: Path):
     assert set(nwb_argument_names) == set(sgc_argument_names)
 
     print(f"test_task_recording_types passed for {nwbfile_path.name}")
+
+
+def test_processed_trials(nwbfile_path: Path) -> None:
+    """Assert ProcessedTrials object_id matches the NWB processed_trials table."""
+    nwb_copy_file_name = get_nwb_copy_filename(nwbfile_path.name)
+    nwb_dict = dict(nwb_file_name=nwb_copy_file_name)
+
+    nwbf = get_nwb_file(str(nwbfile_path))
+    try:
+        pt = nwbf.processing["behavior"]["processed_trials"]
+    except KeyError:
+        print(f"test_processed_trials skipped (no dati data): {nwbfile_path.name}")
+        return
+
+    assert ProcessedTrials() & nwb_dict, f"ProcessedTrials has no entry for {nwb_copy_file_name}"
+    db_object_id = (ProcessedTrials() & nwb_dict).fetch1("processed_trials_object_id")
+    assert db_object_id == pt.object_id, f"object_id mismatch: DB={db_object_id!r}, NWB={pt.object_id!r}"
+    print(f"test_processed_trials passed for {nwbfile_path.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +386,12 @@ def insert_session(
 
     print("BControl tables (TaskRecordingTypes, TaskRecording) populated.")
 
+    # Dati processed_trials table (only for sessions with a dati file)
+    if not (ProcessedTrials() & nwb_dict):
+        ProcessedTrials().insert_from_nwbfile(nwb_copy_file_name, nwbfile)
+    else:
+        print("  ProcessedTrials: already populated, skipping.")
+
     # Spike sorting tables (only for sessions with a units table)
     insert_sorted_spikes(nwb_copy_file_name)
 
@@ -368,6 +406,7 @@ if __name__ == "__main__":
         nwbfile_path = SPYGLASS_RAW_DIR / nwb_file_name
         insert_session(nwbfile_path=nwbfile_path, clean_existing=True)
         test_task_recording_types(nwbfile_path=nwbfile_path)
+        test_processed_trials(nwbfile_path=nwbfile_path)
 
     # Test spike sorting for the session that has units
     ephys_copy = get_nwb_copy_filename("sub-P100_ses-TaskSwitch4-181010a.nwb")
