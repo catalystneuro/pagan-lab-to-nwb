@@ -1,0 +1,35 @@
+# Hardware and units metadata for SpikesMatInterface (ndx-franklab-novela types).
+# Loaded by SpikesMatInterface.get_metadata() as the single source of truth.
+# arc_ecephys/metadata.yaml may override individual fields via dict_deep_update()
+# in convert_session.py if session-specific values differ.
+#
+# DataAcqDevice: Horizontal Headstage 128-Channel Datalogger (HH128) by SpikeGadgets.
+#   Amplifier and ADC circuit are integrated in the same unit (confirmed by lab).
+# Probe: 32-tetrode array.
+#   contact_size: unknown — .nan keeps the DB column NULL without breaking DataJoint queries.
+#   TODO (open_questions.md Q8): confirm wire diameter with lab.
+Ecephys:
+  DataAcqDevice:
+    name: HH128
+    system: SpikeGadgets
+    amplifier: Horizontal Headstage 128-Channel Datalogger  # integrated in HH128 (confirmed by lab)
+    adc_circuit: Horizontal Headstage 128-Channel Datalogger  # integrated in HH128 (confirmed by lab)
+    description: >
+      Horizontal Headstage 128-Channel Datalogger (HH128) by SpikeGadgets.
+      Amplifier and ADC circuit are integrated inside the same Datalogger unit.
+      Used for tetrode array recordings (Pagan Lab, University of Edinburgh).
+    manufacturer: SpikeGadgets
+
+  Units:
+    description: >
+      Spike-sorted units recorded from a 32-tetrode SpikeGadgets array implanted in
+      Long-Evans rats during an auditory task-switching paradigm (BControl).
+      Spike sorting was performed offline using the Pagan Lab pipeline.
+      Each unit includes spike times, mean waveform, waveform SD, and tetrode ID.
+
+  Probe:
+    name: tetrode_array
+    probe_type: tetrode
+    units: mm
+    probe_description: "32-tetrode array (SpikeGadgets, Pagan Lab)"
+    contact_size: .nan  # unknown; .nan → NULL in DB. TODO (open_questions.md Q8): confirm with lab.
