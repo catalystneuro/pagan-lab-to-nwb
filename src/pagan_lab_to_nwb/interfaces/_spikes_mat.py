@@ -21,7 +21,12 @@ from pynwb.misc import Units
 
 from neuroconv.basedatainterface import BaseDataInterface
 from neuroconv.tools import get_module
-from neuroconv.utils import DeepDict, get_base_schema
+from neuroconv.utils import (
+    DeepDict,
+    dict_deep_update,
+    get_base_schema,
+    load_dict_from_file,
+)
 
 
 class SpikesMatInterface(BaseDataInterface):
@@ -167,26 +172,9 @@ class SpikesMatInterface(BaseDataInterface):
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
-        metadata["Ecephys"] = dict(
-            Units=dict(
-                description="Spike-sorted units.",
-            ),
-            DataAcqDevice=dict(
-                name="SpikeGadgets",
-                system="SpikeGadgets",  # TODO (open_questions Q7): confirm with lab
-                amplifier="Intan",  # TODO (open_questions Q7): confirm with lab
-                adc_circuit="Intan",  # TODO (open_questions Q7): confirm with lab
-                description="SpikeGadgets tetrode recording system (Pagan Lab, University of Edinburgh).",
-                manufacturer="SpikeGadgets",
-            ),
-            Probe=dict(
-                name="tetrode_array",
-                probe_type="tetrode",
-                units="mm",
-                probe_description="32-tetrode array (SpikeGadgets, Pagan Lab)",
-                contact_size=None,  # TODO (open_questions Q8): confirm with lab; None → NULL in DB
-            ),
-        )
+        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_spikes_mat_metadata.yaml"
+        editable_metadata = load_dict_from_file(editable_metadata_path)
+        metadata = dict_deep_update(metadata, editable_metadata)
         return metadata
 
     def add_to_nwbfile(

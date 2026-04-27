@@ -11,7 +11,13 @@ from pynwb.device import Device
 from pynwb.file import NWBFile
 
 from neuroconv.basedatainterface import BaseDataInterface
-from neuroconv.utils import DeepDict, get_base_schema, get_schema_from_hdmf_class
+from neuroconv.utils import (
+    DeepDict,
+    dict_deep_update,
+    get_base_schema,
+    get_schema_from_hdmf_class,
+    load_dict_from_file,
+)
 from pagan_lab_to_nwb.interfaces._optogenetics import add_optogenetic_series_to_nwbfile
 from pagan_lab_to_nwb.interfaces._stimulus import add_stimulus_to_trials
 from pagan_lab_to_nwb.interfaces._task_recording import add_task_recording_to_nwbfile
@@ -142,22 +148,9 @@ class BControlBehaviorInterface(BaseDataInterface):
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
-
-        # Behavior table descriptions and device metadata are defined in metadata.yaml
-        # (arc_behavior/metadata.yaml) and merged into this dict by convert_session.py.
-        # Only the key structure is seeded here so downstream code can safely navigate
-        # metadata["Behavior"] before the YAML merge happens.
-        metadata["Behavior"] = dict(
-            Device=dict(name="BControl", manufacturer=""),
-            StateTypesTable=dict(description=""),
-            StatesTable=dict(description=""),
-            ActionsTable=dict(description=""),
-            ActionTypesTable=dict(description=""),
-            EventTypesTable=dict(description=""),
-            EventsTable=dict(description=""),
-            TrialsTable=dict(description=""),
-            TaskArgumentsTable=dict(description=""),
-        )
+        editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_bcontrol_metadata.yaml"
+        editable_metadata = load_dict_from_file(editable_metadata_path)
+        metadata = dict_deep_update(metadata, editable_metadata)
 
         self._read_file()
 

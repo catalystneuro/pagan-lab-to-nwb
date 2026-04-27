@@ -111,13 +111,7 @@ def session_to_nwb(
     session_start_time = session_start_time.replace(tzinfo=ZoneInfo(timezone_str))
     metadata["NWBFile"].update(session_start_time=session_start_time)
 
-    # Merge YAML metadata over interface defaults.
-    # Optogenetics is extracted first and set directly: dict_deep_update treats duplicate
-    # values inside lists as a set union and collapses them (e.g. [473.0, 473.0] → [473.0]).
-    opto_meta = editable_metadata.pop("Optogenetics", None)
     metadata = dict_deep_update(metadata, editable_metadata)
-    if opto_meta is not None:
-        metadata["Optogenetics"] = opto_meta
 
     metadata["Subject"]["subject_id"] = subject_id
     metadata["NWBFile"]["session_id"] = session_id

@@ -50,9 +50,32 @@ script docstring for all options (`--start-batch`, `--batch-size`, `--data-dir`,
             │   ├── convert_all_sessions.py         # Convert all sessions (no upload)
             │   ├── convert_and_upload_batched.py   # Convert + validate + upload any protocol
             │   ├── nwbconverter.py
-            │   ├── metadata.yaml
+            │   ├── metadata.yaml                   # ← Edit here: NWBFile, Subject, Session
             │   └── documentation/                  # See below
-            └── interfaces/                         # Custom NeuroConv interfaces
+            ├── arc_ecephys/                        # Ephys + behavior + video → NWB (Spyglass)
+            │   ├── convert_session.py
+            │   ├── nwbconverter.py
+            │   └── metadata.yaml                   # ← Edit here: NWBFile, Subject
+            ├── metadata/                           # Interface-level metadata (single source of truth)
+            │   ├── _bcontrol_metadata.yaml         #   Behavior tables + Optogenetics hardware
+            │   ├── _spikes_mat_metadata.yaml       #   Ecephys hardware (DataAcqDevice, Probe)
+            │   ├── _dati_mat_metadata.yaml         #   processed_trials column descriptions
+            │   └── _video_metadata.yaml            #   CameraDevice specs
+            └── interfaces/                         # Custom NeuroConv interfaces (load metadata/)
+
+## Metadata
+
+Metadata is split into two layers:
+
+- **`metadata/`** — hardware specs and NWB table/column descriptions, one YAML per interface.
+  These are the single source of truth and are loaded automatically by each interface's
+  `get_metadata()`. Edit these when device specifications or field descriptions change.
+- **`arc_behavior/metadata.yaml`** / **`arc_ecephys/metadata.yaml`** — session- and
+  dataset-level fields only (`NWBFile`, `Subject`, `Session`). Edit these when the
+  experiment description, publication DOI, institution, or subject strain changes.
+
+See [`src/pagan_lab_to_nwb/interfaces/README.md`](src/pagan_lab_to_nwb/interfaces/README.md)
+for the full mapping of which YAML file each interface reads.
 
 ## Tutorials
 
