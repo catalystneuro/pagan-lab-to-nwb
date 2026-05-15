@@ -14,8 +14,7 @@ from pagan_lab_to_nwb.interfaces.spyglass_video_interface import SpyglassVideoIn
 class ArcEcephysNWBConverter(NWBConverter):
     """Converter for sessions with behavior + spike-sorted ephys + optional video.
 
-    Data streams and interface order (order matters — each interface may depend on
-    objects created by a preceding one):
+    Data streams:
 
       1. Behavior          — creates nwbfile.trials
       2. Video             — adds CameraDevice + ImageSeries in behavior module
@@ -40,7 +39,7 @@ class ArcEcephysNWBConverter(NWBConverter):
 
     data_interface_classes = dict(
         Behavior=BControlBehaviorInterface,
-        Video=SpyglassVideoInterface,
-        ProcessedTrials=ProcessedTrialsInterface,
         SpikeSorting=SpikeSortingMatInterface,
+        ProcessedTrials=ProcessedTrialsInterface,
+        Video=SpyglassVideoInterface,
     )
