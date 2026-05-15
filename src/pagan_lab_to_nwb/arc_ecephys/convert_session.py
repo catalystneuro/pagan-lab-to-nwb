@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import pandas as pd
 from pydantic import DirectoryPath, FilePath
 
@@ -149,114 +148,8 @@ def session_to_nwb(
         overwrite=overwrite,
     )
 
-    # ---- Post-write: BinnedAlignedSpikes (rrr4 PSTH) ----
-    # NeuroConv 0.9.x configure_backend raises NotImplementedError for any
-    # NWBDataInterface that is not TimeSeries.  Written here via pynwb r+ instead.
-    # See neuroconv_fix_plan.md for a proposed upstream fix.
-    if dati_file_path is not None:
-        _add_psth_to_nwb(nwbfile_path, Path(dati_file_path))
-
     print(f"Written: '{nwbfile_path}'")
     return nwbfile_path
-
-
-def _add_psth_to_nwb(nwbfile_path: Path, dati_file_path: Path) -> None:
-    """Append BinnedAlignedSpikes (rrr4 PSTH) to an existing NWB file (post-write step).
-
-    NeuroConv's configure_backend raises NotImplementedError for NWBDataInterface types
-    other than TimeSeries, so BinnedAlignedSpikes cannot be written during run_conversion.
-    This function reopens the file in r+ mode with pynwb directly, bypassing NeuroConv.
-    No-op if the PSTH already exists in the file.
-    """
-    import warnings
-
-    import ndx_binned_spikes  # noqa: F401 — registers namespace before NWBHDF5IO
-    import pynwb
-    from ndx_binned_spikes import BinnedAlignedSpikes
-    from pymatreader import read_mat
-
-    d = read_mat(str(dati_file_path))
-    if "rrr4" not in d:
-        return
-
-    rrr4 = np.asarray(d["rrr4"], dtype=np.float32)  # (n_units, n_trials, n_bins)
-    centers4 = np.asarray(d.get("centers4", []), dtype=np.float64)
-
-    if rrr4.ndim != 3 or len(centers4) < 2:
-        warnings.warn("_add_psth_to_nwb: unexpected rrr4/centers4 shape. Skipping.")
-        return
-
-    bin_width_ms = float(np.round((centers4[1] - centers4[0]) * 1000))
-    event_to_bin_offset_ms = float(centers4[0] * 1000)
-
-    with pynwb.NWBHDF5IO(str(nwbfile_path), mode="r+", load_namespaces=True) as io:
-        nwbfile = io.read()
-
-        if "ecephys" in nwbfile.processing and "rrr4_psth" in nwbfile.processing["ecephys"].data_interfaces:
-            return  # already written
-
-        try:
-            dati_trials = nwbfile.processing["behavior"]["processed_trials"]
-            event_timestamps = np.array(dati_trials["cue_start"][:], dtype=np.float64)
-        except (KeyError, TypeError):
-            warnings.warn("_add_psth_to_nwb: cue_start not found in behavior/processed_trials. Skipping.")
-            return
-        if nwbfile.units is None or len(nwbfile.units) == 0:
-            warnings.warn("_add_psth_to_nwb: nwbfile.units is empty. Skipping.")
-            return
-        n_trials_rrr4 = rrr4.shape[1]
-        if len(event_timestamps) != n_trials_rrr4:
-            min_t = min(len(event_timestamps), n_trials_rrr4)
-            warnings.warn(
-                f"_add_psth_to_nwb: trial count mismatch ({len(event_timestamps)} vs {n_trials_rrr4}). Truncating to {min_t}."
-            )
-            event_timestamps = event_timestamps[:min_t]
-            rrr4 = rrr4[:, :min_t, :]
-
-        n_units_rrr4 = min(rrr4.shape[0], len(nwbfile.units))
-        if n_units_rrr4 < rrr4.shape[0]:
-            warnings.warn(f"_add_psth_to_nwb: clamping rrr4 units from {rrr4.shape[0]} to {n_units_rrr4}.")
-            rrr4 = rrr4[:n_units_rrr4, :, :]
-
-        units_region = nwbfile.units.create_region(
-            name="units_region",
-            region=list(range(n_units_rrr4)),
-            description=(
-                "Units included in the rrr4 PSTH. "
-                "May be a subset of all sorted units if the dati pipeline applied "
-                "additional quality filters."
-            ),
-        )
-
-        if "ecephys" not in nwbfile.processing:
-            nwbfile.create_processing_module(name="ecephys", description="Processed electrophysiology data.")
-
-        nwbfile.processing["ecephys"].add(
-            BinnedAlignedSpikes(
-                name="rrr4_psth",
-                description=(
-                    "Peri-stimulus time histogram (PSTH) of spike rates for each unit, "
-                    "aligned to auditory cue onset (cue_start). "
-                    f"Covers {centers4[0]:.1f} to {centers4[-1]:.1f} s around cue onset "
-                    f"in {bin_width_ms:.0f} ms bins ({rrr4.shape[2]} bins total). "
-                    f"Includes {n_units_rrr4} spike-sorted units across {rrr4.shape[1]} trials. "
-                    "Values are in spikes/s. "
-                    "Produced by the Pagan Lab offline spike-sorting pipeline (rrr4 variable). "
-                    "Raw spike times are available in nwbfile.units."
-                ),
-                data=rrr4,
-                bin_width_in_ms=bin_width_ms,
-                event_to_bin_offset_in_ms=event_to_bin_offset_ms,
-                event_timestamps=event_timestamps,
-                units_region=units_region,
-            )
-        )
-        io.write(nwbfile)
-
-    print(
-        f"Added rrr4 PSTH: {n_units_rrr4} units × {rrr4.shape[1]} trials × {rrr4.shape[2]} bins "
-        f"(bin_width={bin_width_ms:.0f} ms, offset={event_to_bin_offset_ms:.0f} ms)"
-    )
 
 
 if __name__ == "__main__":
