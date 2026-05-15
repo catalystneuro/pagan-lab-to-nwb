@@ -6,6 +6,7 @@ from warnings import warn
 
 import numpy as np
 from pydantic import validate_call
+from pynwb import TimeSeries
 from pynwb.file import NWBFile
 
 from neuroconv.basedatainterface import BaseDataInterface
@@ -36,13 +37,14 @@ class ProcessedTrialsInterface(BaseDataInterface):
     Reads the MATLAB v5 file containing:
     - per-trial behavioral variables (choice, hits, task, side, gdir, gfreq, nta, stim)
     - 7 key event timestamps per trial (``tim``)
+    - optional rrr4 PSTH tensor (n_units × n_trials × n_bins)
 
     Writes to NWB:
-    - ``processing["behavior"]["processed_trials"]`` — a ``TimeIntervals`` table containing
-      all behavioral variables (choice, hits, nta, correct_side, task_context,
-      gdir, gfreq, all 7 tim event timestamps, stim_params).  start_time/stop_time
-      are set from tim rows 1 and 6 (dati clock; ~10 ms offset from BControl clock).
-
+    - ``processing["behavior"]["processed_trials"]`` — a ``TimeIntervals`` table with
+      all behavioral variables and a ``timeseries`` column linking each trial to its
+      PSTH row in ``processing["ecephys"]["rrr4_psth"]`` (when rrr4 is present).
+    - ``processing["ecephys"]["rrr4_psth"]`` — a ``TimeSeries`` with shape
+      ``(n_trials, n_units, n_bins)``, aligned to cue onset, values in spikes/s.
     """
 
     display_name = "Pagan Lab Processed Trials"
@@ -69,16 +71,13 @@ class ProcessedTrialsInterface(BaseDataInterface):
             required=["TimeIntervals"],
             properties=dict(TimeIntervals=dict(type="object", properties=dict(description={"type": "string"}))),
         )
-
         return metadata_schema
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
-
         editable_metadata_path = Path(__file__).parent.parent / "metadata" / "_processed_trials_metadata.yaml"
         editable_metadata = load_dict_from_file(editable_metadata_path)
         metadata = dict_deep_update(metadata, editable_metadata)
-
         return metadata
 
     def add_to_nwbfile(
@@ -119,6 +118,61 @@ class ProcessedTrialsInterface(BaseDataInterface):
                 return chars[:n]
             return chars + [""] * (n - len(chars))
 
+        # ---- rrr4 PSTH — create TimeSeries before intervals so we can pass timeseries refs ----
+        # The TimeSeries must exist before add_interval() is called because PyNWB creates
+        # the indexed timeseries column on the first add_interval() call that includes it.
+        psth_ts = None
+        if "rrr4" in d and "centers4" in d:
+            rrr4 = np.asarray(d["rrr4"], dtype=np.float32)  # (n_units, n_trials, n_bins)
+            centers4 = np.asarray(d["centers4"], dtype=np.float64)
+
+            if rrr4.ndim == 3 and len(centers4) >= 2 and rrr4.shape[1] == n:
+                n_units_rrr4 = rrr4.shape[0]
+                n_bins = rrr4.shape[2]
+                bin_width_ms = float(np.round((centers4[1] - centers4[0]) * 1000))
+
+                # Clamp to len(nwbfile.units) in case stub_test reduced the unit count
+                if nwbfile.units is not None and len(nwbfile.units) > 0:
+                    n_units_used = min(n_units_rrr4, len(nwbfile.units))
+                    if n_units_used < n_units_rrr4:
+                        warn(f"ProcessedTrialsInterface: clamping rrr4 from {n_units_rrr4} to {n_units_used} units.")
+                        rrr4 = rrr4[:n_units_used, :, :]
+
+                    # Transpose (n_units, n_trials, n_bins) → (n_trials, n_units, n_bins)
+                    # so axis 0 is the time/trial axis required by TimeSeries.
+                    psth_data = np.transpose(rrr4, (1, 0, 2))
+
+                    # Timestamps: trial_ready (tim row 1) — always defined and monotonically
+                    # increasing. PSTH bins are relative to cue_start within each trial.
+                    trial_ready_ts = np.array(_to_float_list(tim[1, :]), dtype=np.float64)
+
+                    psth_ts = TimeSeries(
+                        name="rrr4_psth",
+                        description=(
+                            f"Peri-stimulus time histogram (PSTH) of spike rates aligned to "
+                            f"auditory cue onset. "
+                            f"Shape per sample: (n_units={rrr4.shape[0]}, n_bins={n_bins}). "
+                            f"Timestamps are trial_ready (start_time) for each trial; "
+                            f"PSTH bins are relative to cue_start within each trial. "
+                            f"Bin width: {bin_width_ms:.0f} ms. "
+                            f"Time range: {float(centers4[0]):.2f} to {float(centers4[-1]):.2f} s "
+                            f"relative to cue onset. "
+                            f"Axis 1 (units) corresponds to nwbfile.units[0:{rrr4.shape[0]}]. "
+                            "Values in spikes/s. "
+                            "Produced by the Pagan Lab spike-sorting pipeline (rrr4 variable)."
+                        ),
+                        data=psth_data,
+                        timestamps=trial_ready_ts,
+                        unit="spikes/s",
+                    )
+                    ecephys = get_module(nwbfile, name="ecephys", description="Processed electrophysiology data.")
+                    ecephys.add(psth_ts)
+                else:
+                    warn("ProcessedTrialsInterface: nwbfile.units is empty — skipping rrr4 PSTH.")
+            else:
+                warn("ProcessedTrialsInterface: rrr4/centers4 shape mismatch or trial count mismatch. Skipping PSTH.")
+
+        # ---- Build processed_trials TimeIntervals ----
         from pynwb.epoch import TimeIntervals
 
         table_meta = metadata.get("Behavior", {}).get("TimeIntervals", {})
@@ -133,10 +187,18 @@ class ProcessedTrialsInterface(BaseDataInterface):
         )
 
         # start_time = trial_ready (tim row 1), stop_time = trial_end (tim row 6).
+        # Each interval optionally carries a timeseries reference to its PSTH row.
         start_times = _to_float_list(tim[1, :])
         stop_times = _to_float_list(tim[6, :])
-        for st, sp in zip(start_times, stop_times):
-            dati_trials.add_interval(start_time=st, stop_time=sp, check_ragged=False)
+        if psth_ts is not None:
+            for st, sp in zip(start_times, stop_times):
+                # PyNWB computes idx_start and count from psth_ts.timestamps vs (st, sp).
+                # Since psth_ts.timestamps = trial_ready_ts and st = trial_ready[i],
+                # idx_start = i and count = 1 for every trial.
+                dati_trials.add_interval(start_time=st, stop_time=sp, timeseries=[psth_ts])
+        else:
+            for st, sp in zip(start_times, stop_times):
+                dati_trials.add_interval(start_time=st, stop_time=sp, check_ragged=False)
 
         # ---- Per-trial behavioral columns (all dati variables) ----
         if "choice" in d:
@@ -175,7 +237,7 @@ class ProcessedTrialsInterface(BaseDataInterface):
             if row_idx >= tim.shape[0]:
                 break
             if col_name in ["trial_ready", "trial_end"]:
-                continue  # these are already used as start_time, stop_time
+                continue  # already used as start_time / stop_time
             dati_trials.add_column(name=col_name, description=_desc(col_name), data=_to_float_list(tim[row_idx, :]))
 
         # ---- stim: per-trial stimulus pulse dicts — JSON serialised ----
@@ -203,4 +265,5 @@ class ProcessedTrialsInterface(BaseDataInterface):
         behavior.add(dati_trials)
 
         if self.verbose:
-            print(f"Added TimeIntervals with {n} trials to behavior processing module.")
+            psth_note = f", rrr4_psth TimeSeries ({psth_ts.data.shape})" if psth_ts is not None else ""
+            print(f"Added TimeIntervals with {n} trials to behavior processing module{psth_note}.")
