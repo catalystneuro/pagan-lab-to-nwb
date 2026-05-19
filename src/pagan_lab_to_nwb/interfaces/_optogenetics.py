@@ -159,6 +159,7 @@ def add_optogenetic_series_to_nwbfile(
     fiber_left = OpticalFiber(
         name=fl["name"],
         description=fl["description"],
+        model=fiber_model,
         fiber_insertion=FiberInsertion(
             name="fiber_insertion",
             insertion_position_ap_in_mm=fl["insertion_position_ap_in_mm"],
@@ -169,6 +170,7 @@ def add_optogenetic_series_to_nwbfile(
     fiber_right = OpticalFiber(
         name=fr["name"],
         description=fr["description"],
+        model=fiber_model,
         fiber_insertion=FiberInsertion(
             name="fiber_insertion",
             insertion_position_ap_in_mm=fr["insertion_position_ap_in_mm"],
