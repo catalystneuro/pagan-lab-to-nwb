@@ -261,25 +261,35 @@ class SpikeSortingMatInterface(BaseDataInterface):
             if col_name not in existing_cols:
                 nwbfile.add_electrode_column(name=col_name, description=col_desc)
 
-        for trode_id in unique_trodes:
-            group = nwbfile.electrode_groups[f"tetrode{trode_id}"]
-            for ch in range(n_channels_per_tetrode):
-                nwbfile.add_electrode(
-                    group=group,
-                    location="unknown",  # placeholder — see open_questions.md Q2
-                    filtering="none",
-                    probe_shank=0,  # tetrodes have 1 shank → shank 0
-                    probe_electrode=ch,  # 0–3 within tetrode
-                    bad_channel=False,
-                    ref_elect_id=-1,  # unknown — update when lab confirms
-                )
-
-        # Ensure behavior processing module exists (required by Spyglass ingestion)
-        if "behavior" not in nwbfile.processing:
-            nwbfile.create_processing_module(name="behavior", description="Behavioral data")
-
-        # Build a lookup: trode_id → index of its first electrode row
-        trode_to_electrode_idx = {trode_id: i * n_channels_per_tetrode for i, trode_id in enumerate(unique_trodes)}
+        # Build a lookup: trode_id → index of its first electrode row.
+        # If the electrode table already has rows (e.g., populated by
+        # PaganLabSpikeGadgetsRecordingInterface), reuse them rather than
+        # adding duplicate rows.  This allows both interfaces to coexist when
+        # SpikeGadgets is listed first in data_interface_classes.
+        if nwbfile.electrodes is not None and len(nwbfile.electrodes) > 0:
+            trode_to_electrode_idx: dict[int, int] = {}
+            for row_idx in range(len(nwbfile.electrodes)):
+                group_name = nwbfile.electrodes["group"][row_idx].name
+                try:
+                    trode_id = int(group_name.replace("tetrode", ""))
+                except ValueError:
+                    continue
+                if trode_id not in trode_to_electrode_idx:
+                    trode_to_electrode_idx[trode_id] = row_idx
+        else:
+            for trode_id in unique_trodes:
+                group = nwbfile.electrode_groups[f"tetrode{trode_id}"]
+                for ch in range(n_channels_per_tetrode):
+                    nwbfile.add_electrode(
+                        group=group,
+                        location="unknown",  # placeholder — see open_questions.md Q2
+                        filtering="none",
+                        probe_shank=0,  # tetrodes have 1 shank → shank 0
+                        probe_electrode=ch,  # 0–3 within tetrode
+                        bad_channel=False,
+                        ref_elect_id=-1,  # unknown — update when lab confirms
+                    )
+            trode_to_electrode_idx = {trode_id: i * n_channels_per_tetrode for i, trode_id in enumerate(unique_trodes)}
 
         # ---- Units table ----
         units_description = metadata.get("Ecephys", {}).get("Units", {}).get("description", "Spike-sorted units.")
