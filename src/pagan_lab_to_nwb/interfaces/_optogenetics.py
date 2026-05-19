@@ -47,6 +47,8 @@ def add_optogenetic_series_to_nwbfile(
         n_trials = min(n_trials, 100)
 
     opto_type = saved_history.get("OptoSection_opto_type", ["Full Trial"] * n_trials)
+    opto_left_power = saved_history.get("OptoSection_opto_left_power", [0] * n_trials)
+    opto_right_power = saved_history.get("OptoSection_opto_right_power", [0] * n_trials)
 
     opto_meta = metadata["Optogenetics"]
     power_mW = opto_meta["power_calibration"]["power_in_mW"]
@@ -206,6 +208,16 @@ def add_optogenetic_series_to_nwbfile(
         otype = opto_type[i] if i < len(opto_type) else "Full Trial"
         win_start, win_stop = opto_windows.get(otype, (0.0, 1.3))
         duration_ms = (win_stop - win_start) * 1000.0
+
+        # Determine which hemisphere(s) received stimulation this trial.
+        # Site 0 = left fiber, site 1 = right fiber.
+        # Any non-zero Cerebro power reading means the laser fired.
+        lp = float(opto_left_power[i]) if i < len(opto_left_power) else 0.0
+        rp = float(opto_right_power[i]) if i < len(opto_right_power) else 0.0
+        sites = [idx for idx, on in [(0, lp > 0), (1, rp > 0)] if on]
+        if not sites:
+            continue  # connected but neither hemisphere fired
+
         epochs_table.add_row(
             start_time=cpoke_starts[i] + win_start,
             stop_time=cpoke_starts[i] + win_stop,
@@ -217,6 +229,6 @@ def add_optogenetic_series_to_nwbfile(
             intertrain_interval_in_ms=float("nan"),
             power_in_mW=power_mW,
             wavelength_in_nm=stim["wavelength_in_nm"],
-            optogenetic_sites=[0, 1],  # both left and right hemisphere sites
+            optogenetic_sites=sites,
         )
     nwbfile.add_time_intervals(epochs_table)
