@@ -19,12 +19,12 @@ dependencies = [
   "dandi>=0.74.3",
 
   # Core NWB dependencies
-  "neuroconv>=0.9.3",
-  "nwbinspector>=0.7.1",
+  "neuroconv==0.9.3",
+  "nwbinspector==0.7.1",
 
   # NWB extensions
-  "ndx-franklab-novela>=0.2.4",
-  "ndx-optogenetics>=0.3.0",
+  "ndx-franklab-novela==0.2.4",
+  "ndx-optogenetics==0.3.0",
   "ndx-structured-behavior @ git+https://github.com/rly/ndx-structured-behavior.git@main",
 
   # Data handling
