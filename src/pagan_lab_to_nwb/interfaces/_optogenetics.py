@@ -20,7 +20,6 @@ from ndx_optogenetics import (
     OptogeneticVirusInjections,
 )
 from pynwb.file import NWBFile
-from pynwb.ogen import OptogeneticSeries, OptogeneticStimulusSite
 
 
 def add_optogenetic_series_to_nwbfile(
@@ -34,15 +33,10 @@ def add_optogenetic_series_to_nwbfile(
 
     This is a no-op for sessions where no trial has ``OptoSection_opto_connected == 1``.
 
-    Two ``OptogeneticSeries`` (left/right hemisphere) are written to ``nwbfile.stimulus``
-    as step-functions.  Per-trial opto columns are added to ``nwbfile.trials``.
-    Rich metadata (virus, fiber, injection coordinates) is stored via ``ndx-optogenetics``.
-
+    Per-trial opto columns are added to ``nwbfile.trials``.  Rich structured metadata
+    (virus, fiber, injection coordinates, epoch table) is stored via ``ndx-optogenetics``.
     All hardware specs, coordinates, and descriptions are read from
     ``metadata["Optogenetics"]`` (populated from arc_behavior/metadata.yaml).
-
-    Power values in ``OptogeneticSeries`` are in watts (SI).  Conversion rule:
-    raw Cerebro internal unit >= cerebro_threshold → power_in_W; otherwise 0 W (laser off).
     """
     opto_connected = saved_history.get("OptoSection_opto_connected", [])
     if not opto_connected or not any(c != 0 for c in opto_connected):
@@ -53,14 +47,9 @@ def add_optogenetic_series_to_nwbfile(
         n_trials = min(n_trials, 100)
 
     opto_type = saved_history.get("OptoSection_opto_type", ["Full Trial"] * n_trials)
-    opto_left_power = saved_history.get("OptoSection_opto_left_power", [0] * n_trials)
-    opto_right_power = saved_history.get("OptoSection_opto_right_power", [0] * n_trials)
 
     opto_meta = metadata["Optogenetics"]
-    power_cal = opto_meta["power_calibration"]
-    threshold = power_cal["cerebro_threshold"]
-    power_W = power_cal["power_in_W"]
-    power_mW = power_cal["power_in_mW"]
+    power_mW = opto_meta["power_calibration"]["power_in_mW"]
     opto_windows = {k: tuple(v) for k, v in opto_meta["stimulation_windows"].items()}
 
     # ── Per-trial opto columns on TrialsTable ─────────────────────────────────
@@ -77,12 +66,6 @@ def add_optogenetic_series_to_nwbfile(
         description=tc["opto_type"]["description"],
         data=[str(_opto_type_full[i]) for i in range(n_table)],
     )
-    # NOTE: opto_left_power / opto_right_power are intentionally NOT added as trials columns.
-    # The hemisphere-resolved power is fully covered by optogenetic_series_left /
-    # optogenetic_series_right (watts, step function).  Adding the raw Cerebro units
-    # alongside would be redundant given the binary conversion rule.
-    # See data_manifest.md §10 for the rationale and a code snippet to recover per-trial
-    # hemisphere stimulation from the OptogeneticSeries.
 
     # ── cpoke start times (t=0 reference for opto windows) ───────────────────
     cpoke_starts = []
@@ -92,29 +75,6 @@ def add_optogenetic_series_to_nwbfile(
             cpoke_starts.append(float(np.asarray(cpoke_state).flat[0]) if len(cpoke_state) else None)
         except (IndexError, KeyError, TypeError, AttributeError):
             cpoke_starts.append(None)
-
-    # ── Step-function timeseries ──────────────────────────────────────────────
-    left_timestamps, left_data = [], []
-    right_timestamps, right_data = [], []
-
-    for i in range(n_trials):
-        if not opto_connected[i] or cpoke_starts[i] is None:
-            continue
-        otype = opto_type[i] if i < len(opto_type) else "Full Trial"
-        win_start, win_stop = opto_windows.get(otype, (0.0, 1.3))
-        t_on = cpoke_starts[i] + win_start
-        t_off = cpoke_starts[i] + win_stop
-        raw_lp = float(opto_left_power[i]) if i < len(opto_left_power) else 0.0
-        raw_rp = float(opto_right_power[i]) if i < len(opto_right_power) else 0.0
-        lp = power_W if raw_lp >= threshold else 0.0
-        rp = power_W if raw_rp >= threshold else 0.0
-        left_timestamps += [t_on, t_off]
-        left_data += [lp, 0.0]
-        right_timestamps += [t_on, t_off]
-        right_data += [rp, 0.0]
-
-    if not left_timestamps:
-        return
 
     # ── ndx-optogenetics: rich structured metadata ────────────────────────────
     em = opto_meta["excitation_source_model"]
@@ -135,14 +95,6 @@ def add_optogenetic_series_to_nwbfile(
     )
     nwbfile.add_device_model(cerebro_model)
     nwbfile.add_device(cerebro)
-
-    # Plain pynwb Device for the laser — required by OptogeneticStimulusSite.device
-    ld = opto_meta["laser_device"]
-    cerebro_laser_device = nwbfile.create_device(
-        name=ld["name"],
-        description=ld["description"],
-        manufacturer=ld["manufacturer"],
-    )
 
     fm = opto_meta["optical_fiber_model"]
     fiber_model = OpticalFiberModel(
@@ -268,48 +220,3 @@ def add_optogenetic_series_to_nwbfile(
             optogenetic_sites=[0, 1],  # both left and right hemisphere sites
         )
     nwbfile.add_time_intervals(epochs_table)
-
-    # ── PyNWB OptogeneticStimulusSite + OptogeneticSeries ────────────────────
-    ssl = opto_meta["stimulus_sites"]["left"]
-    left_site = OptogeneticStimulusSite(
-        name=ssl["name"],
-        device=cerebro_laser_device,
-        description=ssl["description"],
-        excitation_lambda=ssl["excitation_lambda"],
-        location=ssl["location"],
-    )
-    ssr = opto_meta["stimulus_sites"]["right"]
-    right_site = OptogeneticStimulusSite(
-        name=ssr["name"],
-        device=cerebro_laser_device,
-        description=ssr["description"],
-        excitation_lambda=ssr["excitation_lambda"],
-        location=ssr["location"],
-    )
-    nwbfile.add_ogen_site(left_site)
-    nwbfile.add_ogen_site(right_site)
-
-    left_order = np.argsort(left_timestamps)
-    right_order = np.argsort(right_timestamps)
-
-    series_meta = opto_meta["series"]
-    nwbfile.add_stimulus(
-        OptogeneticSeries(
-            name="optogenetic_series_left",
-            data=np.array(left_data)[left_order],
-            timestamps=np.array(left_timestamps)[left_order],
-            site=left_site,
-            description=series_meta["description_template"].format(side="left"),
-            comments=series_meta["comments"],
-        )
-    )
-    nwbfile.add_stimulus(
-        OptogeneticSeries(
-            name="optogenetic_series_right",
-            data=np.array(right_data)[right_order],
-            timestamps=np.array(right_timestamps)[right_order],
-            site=right_site,
-            description=series_meta["description_template"].format(side="right"),
-            comments=series_meta["comments"],
-        )
-    )
