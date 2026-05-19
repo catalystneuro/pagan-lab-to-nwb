@@ -8,8 +8,8 @@ from pagan_lab_to_nwb.interfaces.processed_trials_interface import (
 from pagan_lab_to_nwb.interfaces.spike_sorting_mat_interface import (
     SpikeSortingMatInterface,
 )
-from pagan_lab_to_nwb.interfaces.spikegadgets_recording_interface import (
-    PaganLabSpikeGadgetsRecordingInterface,
+from pagan_lab_to_nwb.interfaces.spyglass_spikegadgets_recording_interface import (
+    SpyglassSpikeGadgetsRecordingInterface,
 )
 from pagan_lab_to_nwb.interfaces.spyglass_video_interface import SpyglassVideoInterface
 
@@ -47,7 +47,7 @@ class ArcEcephysNWBConverter(NWBConverter):
 
     data_interface_classes = dict(
         Behavior=BControlBehaviorInterface,
-        SpikeGadgets=PaganLabSpikeGadgetsRecordingInterface,
+        SpikeGadgets=SpyglassSpikeGadgetsRecordingInterface,
         SpikeSorting=SpikeSortingMatInterface,
         ProcessedTrials=ProcessedTrialsInterface,
         Video=SpyglassVideoInterface,
