@@ -1,0 +1,48 @@
+# YAML metadata for .dati.mat files
+Behavior:
+  TimeIntervals:
+    name: processed_trials
+    description: >
+      Contains trial-by-trial behavioral data and manually processed
+      neural response aligned to trial events
+    columns:
+      choice:
+        description: >
+          Rat's motor response on each trial: 0.0 = chose left reward port,
+          1.0 = chose right reward port. NaN for unrecorded trials.
+      hits:
+        description: >
+          Trial outcome: 1.0 = correct (chose the rewarded port),
+          0.0 = incorrect. NaN for unrecorded trials.
+      nta:
+        description: >
+          Position of this trial within its contextual block (1-indexed).
+          Resets to 1 at each task-context switch (frequency ↔ direction).
+      correct_side:
+        description: >
+          Correct side for each trial.
+          'Left' = left reward port, 'Right' = right reward port.
+      task_context:
+        description: Context on each trial (stimulus location or frequency).
+      gdir:
+        description: Strength of stimulus location.
+      gfreq:
+        description: Strength of stimulus frequency.
+      stim_params:
+        description: >
+          Per-trial stimulus parameters from dati file, JSON-serialised
+          (includes pulse times, frequencies, volumes, etc.).
+      previous_trial_end:
+        description: Timestamp of end of previous trial.
+      trial_ready:
+        description: Timestamp when trial became ready.
+      cue_start:
+        description: Timestamp of start of auditory cue.
+      poke_in:
+        description: Timestamp when rat poked into centre port.
+      poke_out:
+        description: Timestamp when rat poked out of centre port.
+      choice_time:
+        description: Timestamp when rat made its choice.
+      trial_end:
+        description: Timestamp of end of current trial.

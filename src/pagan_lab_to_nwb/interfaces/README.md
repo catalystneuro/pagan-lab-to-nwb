@@ -1,6 +1,34 @@
 # interfaces
 
-This package contains the NWB conversion interface for BControl `.mat` files.
+This package contains the NWB conversion interfaces for Pagan Lab data files.
+
+## Metadata architecture
+
+Metadata is managed in two layers:
+
+**Layer 1 — Interface YAML (single source of truth for hardware and table descriptions)**
+
+Each interface owns a YAML file in `src/pagan_lab_to_nwb/metadata/` that is loaded
+automatically by that interface's `get_metadata()` method.
+Edit these files to change device specs, table descriptions, or column descriptions.
+
+| YAML file | Interface | Contains |
+|---|---|---|
+| `_bcontrol_metadata.yaml` | `BControlBehaviorInterface` | Behavior table descriptions, BControl device, Optogenetics hardware |
+| `_spike_sorting_mat_metadata.yaml` | `SpikeSortingMatInterface` | DataAcqDevice (HH128), Probe, Units description |
+| `_processed_trials_metadata.yaml` | `ProcessedTrialsInterface` | processed_trials column descriptions |
+| `_video_metadata.yaml` | `SpyglassVideoInterface` | CameraDevice specs |
+
+**Layer 2 — Converter YAML (session/experiment-level overrides)**
+
+Each conversion folder (`arc_behavior/`, `arc_ecephys/`) has a `metadata.yaml` that
+contains only session- and dataset-level fields: `NWBFile` (experiment description,
+publication DOI, institution, lab, experimenter) and `Subject` (species, strain, sex).
+These are merged on top of the interface defaults by `convert_session.py`.
+Edit this file when the experiment description or publication details change.
+
+Per-subject fields (`date_of_birth`, `sex`) are injected at runtime from
+`arc_behavior/rat_information.xlsx` and do not need to be set in either YAML.
 
 ## File overview
 

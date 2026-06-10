@@ -1,0 +1,29 @@
+# ── Session-level metadata (arc_ecephys conversion) ──────────────────────────
+# Edit NWBFile and Subject here for dataset-wide changes: experiment description,
+# publication DOI, institution, species, strain, sex.
+#
+# Hardware specs and NWB table descriptions are NOT stored here.
+# They live in src/pagan_lab_to_nwb/metadata/ and are loaded automatically
+# by each interface's get_metadata():
+#   _bcontrol_metadata.yaml   →  Behavior tables + Optogenetics (BControlBehaviorInterface)
+#   _spike_sorting_mat_metadata.yaml →  Ecephys hardware (DataAcqDevice, Probe, Units) (SpikeSortingMatInterface)
+#   _processed_trials_metadata.yaml   →  processed_trials columns (ProcessedTrialsInterface)
+#   _video_metadata.yaml      →  CameraDevice (SpyglassVideoInterface)
+#
+# Per-subject date_of_birth is injected from rat_information.xlsx by convert_session.py.
+# ─────────────────────────────────────────────────────────────────────────────
+NWBFile:
+  lab: Pagan
+  institution: University of Edinburgh
+  # TODO: confirm related publication DOI once published
+  # related_publications:
+  #   - "doi:10.xxxx/xxxxx"
+  experiment_description: >
+    Electrophysiology recordings during a task-switching auditory decision-making task
+    (BControl protocol) in Long-Evans rats. Tetrode arrays were implanted and neural
+    activity was recorded using SpikeGadgets. Spike sorting was performed offline.
+
+Subject:
+  species: Rattus norvegicus
+  sex: M
+  strain: Long Evans
