@@ -7,6 +7,7 @@ Video:
     name: camera_device 1
     meters_per_pixel: 0.001   # unknown for existing cameras; update when Raspberry Pi cameras are used
     model: HDE-Security-Camera-Vision-Pinhole  # confirmed by lab 2026-04-22
+    manufacturer: unknown      # no spec available for this cheap IR pinhole camera
     lens: unknown              # no spec available for this cheap IR pinhole camera
     camera_name: top_camera
   description: "Behavioral video recorded during task-switching session"

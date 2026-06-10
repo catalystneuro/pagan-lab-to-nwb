@@ -173,7 +173,7 @@ Optogenetics:
       Coordinates are relative to Bregma at the cortical surface.
 
   epochs_table:
-    name: optogenetic_epochs
+    name: opto_epochs
     description: >-
       Per-trial optogenetic stimulation intervals in the Frontal Orienting Field (FOF).
       Stimulation is continuous (single pulse) within a window anchored to cpoke onset.

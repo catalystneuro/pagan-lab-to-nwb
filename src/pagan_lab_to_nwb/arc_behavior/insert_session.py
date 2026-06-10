@@ -267,9 +267,13 @@ def insert_session(
 
 
 if __name__ == "__main__":
-    # Update these filenames to match sessions that have been converted and
-    # copied to SPYGLASS_RAW_DIR before running.
+    # Representative sessions across protocol families. Update these filenames
+    # to match sessions that have been converted and copied to SPYGLASS_RAW_DIR
+    # before running.
     for nwb_file_name in [
+        "sub-P007_ses-PBups-150427a.nwb",
+        "sub-P116_ses-ProAnti3Marino-170625a.nwb",
+        "sub-H113_ses-TaskSwitch4-170630a.nwb",
         "sub-P131_ses-TaskSwitch6-190815a.nwb",
     ]:
         nwbfile_path = SPYGLASS_RAW_DIR / nwb_file_name
