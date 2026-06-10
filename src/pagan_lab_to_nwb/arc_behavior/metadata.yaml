@@ -119,11 +119,7 @@ Behavior:
 # All optogenetics hardware specs, surgical coordinates, and stimulation parameters.
 # Source: Pagan et al. 2025 (doi:10.1038/s41586-024-08433-6), Methods section.
 Optogenetics:
-  # Cerebro internal unit → watts conversion.
-  # raw unit >= cerebro_threshold means laser was on at power_in_W (25 mW).
   power_calibration:
-    cerebro_threshold: 800
-    power_in_W: 0.025
     power_in_mW: 25.0
 
   # Stimulation window offsets (seconds) relative to cpoke start, keyed by opto_type string.
@@ -149,13 +145,6 @@ Optogenetics:
     description: >-
       Wireless optogenetic stimulation system (Karpova Lab).
       See https://karpova-lab.github.io/cerebro/
-
-  laser_device:
-    name: Cerebro_laser
-    manufacturer: Karpova Lab
-    description: >-
-      473 nm solid-state laser in the Cerebro wireless optogenetic stimulation system
-      (Karpova Lab). Power calibrated to 25 mW at fibre tip.
 
   optical_fiber_model:
     name: fof_fiber_model
@@ -219,7 +208,7 @@ Optogenetics:
       Coordinates are relative to Bregma at the cortical surface.
 
   epochs_table:
-    name: optogenetic_epochs
+    name: opto_epochs
     description: >-
       Per-trial optogenetic stimulation intervals in the Frontal Orienting Field (FOF).
       Stimulation is continuous (single pulse) within a window anchored to cpoke onset.
@@ -231,30 +220,6 @@ Optogenetics:
     wavelength_in_nm: 473.0
     number_pulses_per_pulse_train: 1
     number_trains: 1
-
-  stimulus_sites:
-    left:
-      name: opto_site_left
-      description: Optical fiber in the left hemisphere FOF, +2 mm AP, -1.3 mm ML from bregma.
-      excitation_lambda: 473.0
-      location: Frontal Orienting Field (FOF), left hemisphere
-    right:
-      name: opto_site_right
-      description: Optical fiber in the right hemisphere FOF, +2 mm AP, +1.3 mm ML from bregma.
-      excitation_lambda: 473.0
-      location: Frontal Orienting Field (FOF), right hemisphere
-
-  series:
-    comments: >-
-      Power values are in watts. Conversion rule: raw Cerebro internal unit >= 800 →
-      25 mW (0.025 W); otherwise laser was off → 0 W. The Cerebro threshold of 800
-      corresponds to the experimenters' calibrated 25 mW output. Raw per-trial values
-      are preserved in the trials table columns OptoSection_opto_left_power /
-      OptoSection_opto_right_power.
-    description_template: >-
-      Laser power (watts) delivered to the {side} hemisphere FOF as a step function.
-      Each stimulation interval is represented by an onset sample (0.025 W = 25 mW)
-      immediately followed by an offset sample (0 W).
 
   trials_columns:
     opto_connected:
