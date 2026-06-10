@@ -30,6 +30,16 @@ uv pip install --editable .
 This installs the package in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#editable-installs)
 so any changes you make to the source are immediately reflected without reinstalling.
 
+### Spyglass database setup (optional)
+
+Both pipelines write NWB files that are compatible with [Spyglass](https://github.com/LorenFrankLab/spyglass)
+(DataJoint). To insert converted sessions into a local Spyglass/MySQL database —
+e.g. to run `insert_session.py` or the `spyglass_tutorial.ipynb` notebooks — follow
+the consolidated setup guide at
+[`src/pagan_lab_to_nwb/spyglass_mock/README.md`](src/pagan_lab_to_nwb/spyglass_mock/README.md)
+(Docker MySQL container, DataJoint config, conversion + insertion steps for both
+pipelines).
+
 ## ARC Behavior
 
 BControl behavioral data from the task-switching auditory decision-making paradigm
@@ -42,7 +52,7 @@ the finite-state-machine states, events, actions, and per-trial stimulus data fo
 
 The full dataset (16,113 NWB files) is published as
 [DANDI:001550](https://dandiarchive.org/dandiset/001550), and the files are also
-Spyglass-compatible (see `arc_behavior/insert_session.py`).
+Spyglass-compatible (see [Spyglass insertion](#spyglass-insertion) below).
 
 ### Running a conversion
 
@@ -81,6 +91,17 @@ Detailed notes for the `arc_behavior` conversion live in
 | `conversion_progress.md` | Per-protocol file counts and DANDI upload status |
 | `nwbinspector_report.md` | NWBInspector results and explanation of each violation |
 
+### Spyglass insertion
+
+```bash
+cd src/pagan_lab_to_nwb/arc_behavior
+python insert_session.py
+```
+
+See [`spyglass_mock/README.md`](src/pagan_lab_to_nwb/spyglass_mock/README.md) for
+database setup, and `spyglass_tutorial.ipynb` for an example of querying an
+inserted session.
+
 ## ARC Ecephys
 
 Conversion code for the lab's ongoing data collection, combining tetrode
@@ -110,6 +131,28 @@ python src/pagan_lab_to_nwb/arc_ecephys/convert_session.py
 |---|---|
 | `arc_ecephys_spyglass_tutorial.ipynb` | Spyglass access tutorial covering electrode/probe geometry, video, spike-sorted units, PSTHs, and processed trials for example sessions P100 and P267 |
 
+### Conversion documentation
+
+Detailed notes for the `arc_ecephys` conversion live in
+[`src/pagan_lab_to_nwb/arc_ecephys/documentation/`](src/pagan_lab_to_nwb/arc_ecephys/documentation/README.md):
+
+| File | Contents |
+|---|---|
+| `data_manifest.md` | Field-by-field map from source files to NWB destinations |
+| `open_questions.md` | Open questions sent to the lab, with resolution status |
+| `spyglass_notes.md` | Errors encountered during Spyglass insertion, fixes applied, and expected warnings |
+
+### Spyglass insertion
+
+```bash
+cd src/pagan_lab_to_nwb/arc_ecephys
+python insert_session.py
+```
+
+See [`spyglass_mock/README.md`](src/pagan_lab_to_nwb/spyglass_mock/README.md) for
+database setup, and `arc_ecephys_spyglass_tutorial.ipynb` for example queries
+(electrode/probe geometry, spike-sorted units, PSTHs, processed trials, video).
+
 ## Repository structure
 
     pagan-lab-to-nwb/
@@ -130,7 +173,12 @@ python src/pagan_lab_to_nwb/arc_ecephys/convert_session.py
             │   ├── convert_session.py
             │   ├── insert_session.py               # Insert into Spyglass database
             │   ├── nwbconverter.py
-            │   └── metadata.yaml                   # ← Edit here: NWBFile, Subject
+            │   ├── metadata.yaml                   # ← Edit here: NWBFile, Subject
+            │   ├── dj_local_conf.example.json      # Template DataJoint config (copy → dj_local_conf.json)
+            │   └── documentation/                  # See below
+            ├── spyglass_mock/                       # Spyglass/DataJoint database setup (Docker MySQL)
+            │   ├── README.md                        # Setup guide for both pipelines
+            │   └── docker-compose.yml
             ├── metadata/                           # Interface-level metadata (single source of truth)
             │   ├── _bcontrol_metadata.yaml          #   Behavior tables + Optogenetics hardware
             │   ├── _spike_sorting_mat_metadata.yaml #   Ecephys hardware (DataAcqDevice, Probe, Units)
