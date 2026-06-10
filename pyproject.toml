@@ -83,7 +83,8 @@ known_first_party = ["pagan_lab_to_nwb"]
 [tool.codespell]
 skip = '.git*,*.pdf,*.css'
 check-hidden = true
-ignore-words-list = 'assertin,fof'
+ignore-words-list = 'assertin,fof,sems,clea'
+ignore-regex = '"image/(png|jpeg)": "[A-Za-z0-9+/=]+"'
 
 [tool.ruff]
 
