@@ -1,0 +1,32 @@
+{
+    "database.host": "localhost",
+    "database.password": "simple",
+    "database.user": "root",
+    "database.port": 3306,
+    "database.reconnect": true,
+    "database.use_tls": false,
+    "loglevel": "INFO",
+    "safemode": true,
+    "fetch_format": "array",
+    "display.limit": 12,
+    "display.width": 14,
+    "display.show_tuple_count": true,
+    "enable_python_native_blobs": true,
+    "add_hidden_timestamp": false,
+    "filepath_checksum_size_limit": 1073741824,
+    "custom": {
+        "debug_mode": "false",
+        "test_mode": "false",
+        "spyglass_dirs": {
+            "base": "/path/to/pagan_data",
+            "raw": "/path/to/pagan_data/raw",
+            "analysis": "/path/to/pagan_data/analysis",
+            "recording": "/path/to/pagan_data/recording",
+            "sorting": "/path/to/pagan_data/spikesorting",
+            "waveforms": "/path/to/pagan_data/waveforms",
+            "temp": "/path/to/pagan_data/tmp",
+            "video": "/path/to/pagan_data/video",
+            "export": "/path/to/pagan_data/export"
+        }
+    }
+}
