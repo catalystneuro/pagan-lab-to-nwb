@@ -17,27 +17,24 @@ classifiers = [
 dependencies = [
   # DANDI dependencies (data upload)
   "dandi>=0.74.3",
-
+  "remfile==0.1.13",
   # Core NWB dependencies
   "neuroconv==0.9.3",
   "nwbinspector==0.7.1",
-
   # NWB extensions
   "ndx-franklab-novela==0.2.4",
   "ndx-optogenetics==0.3.0",
   "ndx-structured-behavior @ git+https://github.com/rly/ndx-structured-behavior.git@main",
-
   # Data handling
   "pymatreader>=1.2.0",
   "openpyxl>=3.0.0",
   "tqdm>=4.0.0",
   "pandas>=1.5.0",
-  "tabulate" # pretty printing
+  "tabulate", # pretty printing # Spyglass
+  # Spyglass dependencies
+  "spyglass-neuro @ git+https://github.com/weiglszonja/spyglass.git@ndx-structured-behavior",
+  "ipykernel>=7.2.0",
 ]
-
-[project.optional-dependencies]
-arc_behavior = []
-arc_ecephys = []
 
 [project.urls]
 Repository = "https://github.com/catalystneuro/pagan-lab-to-nwb"
@@ -48,6 +45,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

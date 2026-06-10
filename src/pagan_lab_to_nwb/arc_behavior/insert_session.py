@@ -53,6 +53,7 @@ SPYGLASS_RAW_DIR = Path(raw_dir)
 # Spyglass column limits that our NWB content can exceed.
 _EXPERIMENT_DESCRIPTION_LIMIT = 2000  # common_session.Session VARCHAR(2000)
 _ARGUMENT_DESCRIPTION_LIMIT = 255  # common_task_rec.TaskRecordingTypes.Arguments VARCHAR(255)
+_EXPRESSION_LIMIT = 2000  # common_task_rec.TaskRecordingTypes.Arguments VARCHAR(2000)
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +118,9 @@ def patch_for_spyglass(nwbfile_path: Path) -> None:
     --------------
     - ``general/experiment_description`` → VARCHAR(2000) limit
     - ``general/task/task_arguments/argument_description`` → VARCHAR(255) limit
+    - ``general/task/task_arguments/expression`` → VARCHAR(2000) limit
+      (BControl protocols embed full FSM code here; e.g. SessionDefinition_training_stages
+      can be 40,000+ characters)
     """
     nwbfile_path = Path(nwbfile_path)
     with h5py.File(nwbfile_path, "a") as f:
@@ -125,6 +129,11 @@ def patch_for_spyglass(nwbfile_path: Path) -> None:
             f,
             "general/task/task_arguments/argument_description",
             _ARGUMENT_DESCRIPTION_LIMIT,
+        )
+        _h5_truncate_string_array(
+            f,
+            "general/task/task_arguments/expression",
+            _EXPRESSION_LIMIT,
         )
 
 
