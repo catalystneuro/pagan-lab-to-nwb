@@ -150,10 +150,10 @@ NWBFile
 │
 ├── ogen_sites                                    ← opto sessions only
 │   ├── opto_site_left (OptogeneticStimulusSite)
-│   │   ├── excitation_lambda  ← 473.0 nm (ChR2)
+│   │   ├── excitation_lambda  ← 450.0 nm (blue light, ChR2)
 │   │   └── location           ← "FOF, left hemisphere"
 │   └── opto_site_right (OptogeneticStimulusSite)
-│       ├── excitation_lambda  ← 473.0 nm
+│       ├── excitation_lambda  ← 450.0 nm
 │       └── location           ← "FOF, right hemisphere"
 │
 ├── stimulus                                      ← opto sessions only

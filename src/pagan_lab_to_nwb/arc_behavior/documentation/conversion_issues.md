@@ -154,15 +154,27 @@ ValueError: CustomClassGenerator.set_init.<locals>.__init__: incorrect shape for
 wavelength_range_in_nm: got (1,), and expected [2]
 ```
 **Root cause:** `_bcontrol_metadata.yaml` correctly specifies
-`wavelength_range_in_nm: [473.0, 473.0]`, but
+`wavelength_range_in_nm: [450.0, 450.0]`, but
 `dict_deep_update(metadata, editable_metadata)` (used in
 `bcontroldatainterface.get_metadata()`) deduplicates identical list elements
-when merging into an empty dict, collapsing `[473.0, 473.0]` to `[473.0]`.
+when merging into an empty dict, collapsing `[450.0, 450.0]` to `[450.0]`.
 `ndx-optogenetics==0.3.0`'s `ExcitationSourceModel` requires shape `(2,)`.
 **Fix:** In `interfaces/_optogenetics.py`, before constructing
 `ExcitationSourceModel`, the `wavelength_range_in_nm` list is duplicated back
 to length 2 if `dict_deep_update` collapsed it to length 1.
 **Status:** Fixed.
+
+**Wavelength value correction (2026-06-11):** The placeholder value of 473.0 nm
+(a generic "blue DPSS laser" assumption) was replaced with 450.0 nm across
+`_bcontrol_metadata.yaml` (`excitation_source_model.wavelength_range_in_nm`,
+`laser_device.description`, `stimulation.wavelength_in_nm`,
+`stimulus_sites.*.excitation_lambda`) and `data_manifest.md`. Source: Mah et al.
+2024 (Nature, doi:10.1038/s41586-024-08433-6), Extended Data Fig. 4f,g caption,
+which states the FOF inactivation experiments used "blue light (450 nm, 25 mW)"
+via AAV2/5-mDlx-ChR2-mCherry and the Cerebro wireless system — matching the
+25 mW power already in the metadata. No manufacturer datasheet for the Cerebro
+laser diode giving an actual spectral *range*/tolerance was found, so the value
+remains a single wavelength duplicated to satisfy the shape-(2,) requirement.
 
 ---
 

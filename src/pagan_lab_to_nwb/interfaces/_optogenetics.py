@@ -81,7 +81,8 @@ def add_optogenetic_series_to_nwbfile(
     # ── ndx-optogenetics: rich structured metadata ────────────────────────────
     em = opto_meta["excitation_source_model"]
     # dict_deep_update deduplicates list values, so a single-wavelength laser's
-    # [473.0, 473.0] range collapses to [473.0]; restore the required length-2 shape.
+    # two-element range (e.g. [450.0, 450.0]) collapses to one element; restore
+    # the required length-2 shape.
     wavelength_range_in_nm = list(em["wavelength_range_in_nm"])
     if len(wavelength_range_in_nm) == 1:
         wavelength_range_in_nm = wavelength_range_in_nm * 2
