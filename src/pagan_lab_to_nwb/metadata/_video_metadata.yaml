@@ -1,13 +1,13 @@
 # CameraDevice (ndx-franklab-novela) — required for Spyglass VideoFile ingestion.
 # Spyglass VideoFile.make() reads CameraDevice attached to each ImageSeries.
-# Camera: cheap IR pinhole (HDE-Security-Camera-Vision-Pinhole). Specs not available.
+# Camera: IR pinhole (HDE-Security-Camera-Vision-Pinhole). Specs not available.
 # Future sessions will use Raspberry Pi cameras — update model/lens/meters_per_pixel then.
 Video:
   CameraDevice:
     name: camera_device 1
     meters_per_pixel: 0.001   # unknown for existing cameras; update when Raspberry Pi cameras are used
     model: HDE-Security-Camera-Vision-Pinhole  # confirmed by lab 2026-04-22
-    manufacturer: unknown      # no spec available for this cheap IR pinhole camera
-    lens: unknown              # no spec available for this cheap IR pinhole camera
+    manufacturer: unknown      # no spec available for this camera
+    lens: unknown              # no spec available for this camera
     camera_name: top_camera
   description: "Behavioral video recorded during task-switching session"
