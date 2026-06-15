@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from hdmf.common import DynamicTable
 from ndx_franklab_novela import CameraDevice
 from pydantic import validate_call
 from pynwb.file import NWBFile
@@ -10,8 +9,9 @@ from pynwb.image import ImageSeries
 
 from neuroconv.basedatainterface import BaseDataInterface
 from neuroconv.datainterfaces.behavior.video.video_utils import get_video_timestamps
-from neuroconv.tools import get_module
 from neuroconv.utils import DeepDict, dict_deep_update, load_dict_from_file
+
+from ._spyglass_tasks import add_spyglass_task_table
 
 
 class SpyglassVideoInterface(BaseDataInterface):
@@ -56,16 +56,24 @@ class SpyglassVideoInterface(BaseDataInterface):
         camera_meta = video_meta["CameraDevice"]
 
         # ---- CameraDevice (Spyglass: required on ImageSeries) ----
-        # Note: ndx-franklab-novela >= 0.2.4 treats 'model' as a DeviceModel reference.
-        # Use 'model_name' (deprecated str field) for the model string, or omit and
-        # include model info in the description.
+        # ndx-franklab-novela >= 0.2.4 requires 'model' to be a DeviceModel reference
+        # (Spyglass's CameraDevice ingestion reads camera_device.model.name /
+        # camera_device.model.manufacturer).
         if camera_meta["name"] not in nwbfile.devices:
+            model_name = camera_meta.get("model", "unknown")
+            manufacturer = camera_meta.get("manufacturer", "unknown")
+            device_model = nwbfile.create_device_model(
+                name=model_name,
+                manufacturer=manufacturer,
+                description=f"Behavioral camera model: {model_name}.",
+            )
             camera_device = CameraDevice(
                 name=camera_meta["name"],
                 meters_per_pixel=float(camera_meta["meters_per_pixel"]),
                 lens=camera_meta.get("lens", "unknown"),
                 camera_name=camera_meta["camera_name"],
-                description=(f"Behavioral camera. Model: {camera_meta.get('model', 'unknown')}. "),
+                model=device_model,
+                description=f"Behavioral camera. Model: {model_name}.",
             )
             nwbfile.add_device(camera_device)
         else:
@@ -94,31 +102,10 @@ class SpyglassVideoInterface(BaseDataInterface):
 
         nwbfile.add_acquisition(image_series)
 
-        # Add a custom processing module for tasks
-        # This is necessary for the video data to be compatible with spyglass.
-        tasks_module = get_module(nwbfile, name="tasks", description="tasks module")
-
-        task_table = DynamicTable(
-            name=protocol,
-            description=f"{protocol} behavioral task",
-        )
-        task_table.add_column(name="task_name", description="Name of the task")
-        task_table.add_column(name="task_description", description="Description of the task")
-        task_table.add_column(name="task_type", description="Type of task (required by Spyglass Task table)")
-        task_table.add_column(name="task_subtype", description="Subtype of task (required by Spyglass Task table)")
-        task_table.add_column(name="task_environment", description="Recording environment")
-        task_table.add_column(name="camera_id", description="Camera IDs used during this task")
-        task_table.add_column(name="task_epochs", description="Epoch indices for this task")
-        task_table.add_row(
-            task_name=protocol,
-            task_description="Auditory decision-making task-switching paradigm (BControl)",
-            task_type="auditory decision-making",
-            task_subtype="task-switching",
-            task_environment="behavioral_box",
-            camera_id=[1],
-            task_epochs=[1],
-        )
-        tasks_module.add(task_table)
+        # Spyglass TaskEpoch.make() requires processing["tasks"][protocol] to exist.
+        # No-op if the SpikeSorting interface already created it for this protocol
+        # (e.g. an ephys+video session); camera_id then stays empty for that table.
+        add_spyglass_task_table(nwbfile, protocol=protocol, camera_id=[1])
 
         if self.verbose:
             print(f"Added video '{Path(self.source_data['file_path']).name}' ")

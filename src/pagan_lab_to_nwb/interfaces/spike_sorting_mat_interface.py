@@ -7,7 +7,6 @@ NwbElectrodeGroup) for Spyglass ingestion compatibility.
 from pathlib import Path
 
 import numpy as np
-from hdmf.common import DynamicTable
 from ndx_franklab_novela import (
     DataAcqDevice,
     NwbElectrodeGroup,
@@ -20,13 +19,14 @@ from pynwb.file import NWBFile
 from pynwb.misc import Units
 
 from neuroconv.basedatainterface import BaseDataInterface
-from neuroconv.tools import get_module
 from neuroconv.utils import (
     DeepDict,
     dict_deep_update,
     get_base_schema,
     load_dict_from_file,
 )
+
+from ._spyglass_tasks import add_spyglass_task_table
 
 
 class SpikeSortingMatInterface(BaseDataInterface):
@@ -222,7 +222,9 @@ class SpikeSortingMatInterface(BaseDataInterface):
                 units=probe_meta["units"],
                 probe_description=probe_meta["probe_description"],
                 contact_side_numbering=False,
-                contact_size=probe_meta.get("contact_size"),  # None → NULL; float("nan") breaks DJ queries
+                # Must be a real float (see _spike_sorting_mat_metadata.yaml comment):
+                # NaN/None breaks Spyglass Probe.Electrode duplicate-validation on re-insert.
+                contact_size=probe_meta.get("contact_size"),
                 shanks=shanks,
             )
             nwbfile.add_device(probe)
@@ -340,32 +342,6 @@ class SpikeSortingMatInterface(BaseDataInterface):
                 waveform_sd=unit_data["waveform_sd"][i],
             )
 
-        # Add a custom processing module for tasks
-        tasks_module = get_module(nwbfile, name="tasks", description="tasks module")
-        if protocol not in tasks_module.data_interfaces:
-            task_table = DynamicTable(
-                name=protocol,
-                description=f"{protocol} behavioral task",
-            )
-
-            task_table.add_column(name="task_name", description="Name of the task")
-            task_table.add_column(name="task_description", description="Description of the task")
-            task_table.add_column(name="task_type", description="Type of task (required by Spyglass Task table)")
-            task_table.add_column(name="task_subtype", description="Subtype of task (required by Spyglass Task table)")
-            task_table.add_column(name="task_environment", description="Recording environment")
-            task_table.add_column(name="camera_id", description="Camera IDs used during this task")
-            task_table.add_column(name="task_epochs", description="Epoch indices for this task")
-            task_table.add_row(
-                task_name=protocol,
-                task_description="Auditory decision-making task-switching paradigm (BControl)",
-                task_type="auditory decision-making",
-                task_subtype="task-switching",
-                task_environment="behavioral_box",
-                camera_id=np.array([], dtype=np.int32),
-                task_epochs=[1],
-            )
-            tasks_module.add(task_table)
-
         # Max spike time across all units — actual end of ephys recording.
         # goodp is intentionally not used here: it marks the validated subset of the
         # recording, not the full session duration.
@@ -379,6 +355,10 @@ class SpikeSortingMatInterface(BaseDataInterface):
             stop_time=max_spike,
             tags=["01"],
         )
+
+        # Spyglass TaskEpoch.make() requires processing["tasks"][protocol] to exist.
+        # No camera info is available at this point (Video interface runs after, if present).
+        add_spyglass_task_table(nwbfile, protocol=protocol, camera_id=np.array([], dtype=np.int32))
 
         if self.verbose:
             total_spikes = sum(len(st) for st in unit_data["spike_times"][: unit_data["n_units"]])

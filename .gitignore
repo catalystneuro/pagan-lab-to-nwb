@@ -147,3 +147,7 @@ dmypy.json
 
 # NWB files
 **.nwb
+
+# Local DataJoint/Spyglass config and database data (machine-specific)
+src/pagan_lab_to_nwb/arc_ecephys/dj_local_conf.json
+src/pagan_lab_to_nwb/spyglass_mock/data/

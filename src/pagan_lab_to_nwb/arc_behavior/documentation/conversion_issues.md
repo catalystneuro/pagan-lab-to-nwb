@@ -143,3 +143,95 @@ P187_190801b, P187_190627b, and all 7 P189 sessions in 2021) are confirmed "Ende
 aborts — intentional exclusions. No additional data-specific fixes are needed.
 
 ---
+
+## 8. `wavelength_range_in_nm` collapses to length 1 for single-wavelength lasers
+
+**Affected files:** All TaskSwitch6 sessions with active optogenetics (e.g.
+`sub-P131_ses-TaskSwitch6-*.nwb`).
+**Symptom:**
+```
+ValueError: CustomClassGenerator.set_init.<locals>.__init__: incorrect shape for
+wavelength_range_in_nm: got (1,), and expected [2]
+```
+**Root cause:** `_bcontrol_metadata.yaml` correctly specifies
+`wavelength_range_in_nm: [450.0, 450.0]`, but
+`dict_deep_update(metadata, editable_metadata)` (used in
+`bcontroldatainterface.get_metadata()`) deduplicates identical list elements
+when merging into an empty dict, collapsing `[450.0, 450.0]` to `[450.0]`.
+`ndx-optogenetics==0.3.0`'s `ExcitationSourceModel` requires shape `(2,)`.
+**Fix:** In `interfaces/_optogenetics.py`, before constructing
+`ExcitationSourceModel`, the `wavelength_range_in_nm` list is duplicated back
+to length 2 if `dict_deep_update` collapsed it to length 1.
+**Status:** Fixed.
+
+**Wavelength value correction (2026-06-11):** The placeholder value of 473.0 nm
+(a generic "blue DPSS laser" assumption) was replaced with 450.0 nm across
+`_bcontrol_metadata.yaml` (`excitation_source_model.wavelength_range_in_nm`,
+`laser_device.description`, `stimulation.wavelength_in_nm`,
+`stimulus_sites.*.excitation_lambda`) and `data_manifest.md`. Source: Mah et al.
+2024 (Nature, doi:10.1038/s41586-024-08433-6), Extended Data Fig. 4f,g caption,
+which states the FOF inactivation experiments used "blue light (450 nm, 25 mW)"
+via AAV2/5-mDlx-ChR2-mCherry and the Cerebro wireless system — matching the
+25 mW power already in the metadata. No manufacturer datasheet for the Cerebro
+laser diode giving an actual spectral *range*/tolerance was found, so the value
+remains a single wavelength duplicated to satisfy the shape-(2,) requirement.
+
+---
+
+## 9. Spyglass `OptogeneticProtocol` insertion fails for per-trial `optogenetic_epochs`
+
+**Affected files:** All sessions with active optogenetics (e.g.
+`sub-P131_ses-TaskSwitch6-190815a.nwb`), when inserted into Spyglass.
+**Symptom:**
+```
+[ERROR] Spyglass: Errors occurred during population for sub-P131_ses-TaskSwitch6-190815a_.nwb:
+	Failed tables ['OptogeneticProtocol']
+AttributeError: 'Pandas' object has no attribute 'epoch_number'
+```
+**Root cause:** Our optogenetics epochs table (`ndx-optogenetics`
+`OptogeneticEpochsTable`) has **one row per stimulation interval** (the
+documented structure used for DANDI:001550 and
+`tutorials/arc_behavior_optogenetics_notebook.ipynb`). Spyglass's
+`OptogeneticProtocol.make()` does an exact-name lookup
+`nwb.intervals.get("optogenetic_epochs", None)` and, if found, expects **one
+row per `TaskEpoch`** with extra `epoch_number`/`convenience_code` columns and
+a primary key of `(nwb_file_name, epoch)` — incompatible with our per-trial
+structure both in column names and in row cardinality. At the time this error
+was hit, `_bcontrol_metadata.yaml`'s `epochs_table.name` had reverted to
+`optogenetic_epochs` during the April 2026 metadata centralization
+(`0af6155`), silently undoing an earlier rename to `opto_epochs` (May 2026,
+`6d8063e`) that had been applied to a since-removed metadata file —
+`tutorials/arc_behavior_optogenetics_notebook.ipynb` already referenced
+`opto_epochs`, so it was out of sync with the NWB files it was written
+against.
+**Fix:** Renamed `_bcontrol_metadata.yaml`'s `Optogenetics.epochs_table.name`
+back to `opto_epochs`. With this name, `OptogeneticProtocol.make()`'s
+`nwb.intervals.get("optogenetic_epochs", None)` returns `None`, so it logs a
+warning and returns — no `InsertError`, and `Session`/`TaskEpoch`/
+`TaskRecordingTypes`/`TaskRecording` insert normally with the standard
+`rollback_on_fail=True, raise_err=True`. This also makes
+`arc_behavior_optogenetics_notebook.ipynb`'s existing `opto_epochs` references
+correct again.
+**Status:** Fixed. `OptogeneticProtocol` is intentionally not populated for
+opto sessions — the rich per-trial stimulation data remains fully present and
+queryable directly from the NWB file's `opto_epochs` table.
+`VirusInjection`/`OpticalFiberImplant` also insert 0 rows for opto sessions
+(`missing required attribute pitch`/`hemisphere` — `FiberInsertion`/
+`ViralVectorInjection` in `_optogenetics.py` don't set these fields); this is
+a separate, non-fatal gap, not yet investigated.
+
+**Towards full Spyglass `OptogeneticProtocol` compatibility (not implemented):**
+Populating `OptogeneticProtocol` would require an *additional*,
+session/epoch-level table literally named `optogenetic_epochs` with exactly
+one row per `TaskEpoch` (these sessions have one epoch), containing
+`epoch_number`, `convenience_code`, `pulse_length_in_ms`,
+`number_pulses_per_pulse_train`, `period_in_ms`, `intertrain_interval_in_ms`,
+`power_in_mW`, and a `stimulus_signal` reference (an NWB `TimeSeries`/`DIO`
+object whose `object_id` becomes `OptogeneticProtocol.stimulus_object_id`) —
+alongside (not instead of) the existing per-trial `opto_epochs` table. This
+needs lab input on what session-level "protocol" values to report when
+per-trial parameters vary (window type, L/R power), plus a new `TimeSeries`
+for `stimulus_signal`. Worth scoping as a follow-up if Spyglass-side
+optogenetics queries become a priority.
+
+---
