@@ -25,5 +25,6 @@ NWBFile:
 
 Subject:
   species: Rattus norvegicus
+  description: Long-Evans rat, wild-type.
   sex: M
   strain: Long Evans

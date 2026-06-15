@@ -32,7 +32,7 @@ dependencies = [
   "pandas>=1.5.0",
   "tabulate", # pretty printing # Spyglass
   # Spyglass dependencies
-  "spyglass-neuro @ git+https://github.com/weiglszonja/spyglass.git@ndx-structured-behavior",
+  "spyglass-neuro @ git+https://github.com/weiglszonja/spyglass.git@pagan-lab-to-nwb-fixes-v2",
   "ipykernel>=7.2.0",
 ]
 
@@ -83,7 +83,8 @@ known_first_party = ["pagan_lab_to_nwb"]
 [tool.codespell]
 skip = '.git*,*.pdf,*.css'
 check-hidden = true
-ignore-words-list = 'assertin'
+ignore-words-list = 'assertin,fof,sems,clea'
+ignore-regex = '"image/(png|jpeg)": "[A-Za-z0-9+/=]+"'
 
 [tool.ruff]
 

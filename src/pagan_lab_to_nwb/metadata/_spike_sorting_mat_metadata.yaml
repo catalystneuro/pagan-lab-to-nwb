@@ -6,8 +6,12 @@
 # DataAcqDevice: Horizontal Headstage 128-Channel Datalogger (HH128) by SpikeGadgets.
 #   Amplifier and ADC circuit are integrated in the same unit (confirmed by lab).
 # Probe: 32-tetrode array.
-#   contact_size: unknown — .nan keeps the DB column NULL without breaking DataJoint queries.
-#   TODO (open_questions.md Q8): confirm wire diameter with lab.
+#   contact_size: unknown — using 0.0125 mm (12.5 um), a standard nichrome tetrode
+#   wire diameter, as a placeholder. A real numeric value (rather than NaN/None) is
+#   required: Spyglass's IngestionMixin._unequal_vals() treats NaN as always-unequal
+#   to NULL, so a NaN-derived contact_size triggers an unresolvable "accept divergence"
+#   prompt (EOFError in non-interactive runs) on every Probe.Electrode insert after the
+#   first. TODO (open_questions.md Q8): confirm actual wire diameter with lab.
 Ecephys:
   DataAcqDevice:
     name: HH128
@@ -32,4 +36,4 @@ Ecephys:
     probe_type: tetrode
     units: mm
     probe_description: "32-tetrode array (SpikeGadgets, Pagan Lab)"
-    contact_size: .nan  # unknown; .nan → NULL in DB. TODO (open_questions.md Q8): confirm with lab.
+    contact_size: 0.0125  # 12.5 um, typical nichrome tetrode wire. TODO (open_questions.md Q8): confirm with lab.

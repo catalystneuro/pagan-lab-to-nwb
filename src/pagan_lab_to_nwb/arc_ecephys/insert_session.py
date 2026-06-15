@@ -41,7 +41,6 @@ dj.conn(use_tls=False)
 import spyglass.common as sgc
 import spyglass.data_import as sgi
 import spyglass.spikesorting.v1 as sgs
-from spyglass.common import Nwbfile
 from spyglass.common.common_task_rec import TaskRecording, TaskRecordingTypes
 from spyglass.settings import raw_dir
 from spyglass.spikesorting.analysis.v1.group import (
@@ -102,17 +101,11 @@ def seed_lookup_tables():
         },
         skip_duplicates=True,
     )
-    sgc.CameraDevice.insert1(
-        {
-            "camera_name": "top_camera",
-            "meters_per_pixel": 0.001,
-            "manufacturer": "unknown",
-            "model": "unknown",
-            "lens": "unknown",
-            "camera_id": 1,
-        },
-        skip_duplicates=True,
-    )
+    # CameraDevice is intentionally not pre-seeded here: it is created by
+    # sgi.insert_sessions() from the NWB file's CameraDevice + DeviceModel
+    # (see interfaces/spyglass_video_interface.py and
+    # metadata/_video_metadata.yaml). Pre-seeding with placeholder values
+    # would conflict with CameraDevice's _expected_duplicates check.
 
 
 # ---------------------------------------------------------------------------
@@ -129,14 +122,20 @@ def clean_db_entry(nwb_file_name: str):
     copy_file_name = get_nwb_copy_filename(nwb_file_name)
     nwb_dict = {"nwb_file_name": copy_file_name}
 
+    # Capture lookup-table references before the cascading Nwbfile delete
+    # removes the session-level rows that point to them.
+    probe_ids = (sgc.ElectrodeGroup & nwb_dict).fetch("probe_id", as_dict=True)
+    camera_names = (sgc.VideoFile & nwb_dict).fetch("camera_name", as_dict=True)
+
     # Delete Nwbfile — cascades to Session and all its descendants
     (sgc.Nwbfile & nwb_dict).delete(safemode=False)
 
-    # Delete non-cascading lookup entries tied to this session
-    probe_ids = (sgc.ElectrodeGroup & nwb_dict).fetch("probe_id", as_dict=True)
+    # Delete non-cascading lookup entries tied to this session. These are
+    # re-created from the NWB file on the next insert; removing them avoids
+    # spurious 'accept_divergence' prompts (e.g. a NaN-valued field that was
+    # stored as NULL on first insert no longer matches a freshly-generated
+    # NaN on re-insert).
     (sgc.Probe & probe_ids).delete(safemode=False)
-    (sgc.IntervalList & nwb_dict).delete(safemode=False)
-    camera_names = (sgc.VideoFile & nwb_dict).fetch("camera_name", as_dict=True)
     (sgc.CameraDevice & camera_names).delete(safemode=False)
 
 
@@ -366,9 +365,7 @@ def insert_session(
 
     if clean_existing:
         print(f"Cleaning existing entries for {nwbfile_path.name} ...")
-        sgc_nwbfile = Nwbfile() & nwb_dict
-        if sgc_nwbfile:
-            sgc_nwbfile.delete(safemode=False)
+        clean_db_entry(nwbfile_path.name)
 
     # Core Spyglass tables (Session, Subject, Electrode, Probe, VideoFile, etc.)
     print(f"Inserting: {nwbfile_path.name}")
