@@ -261,6 +261,81 @@ a more specific part name.
 |---|---|---|
 | Raw SpikeGadgets `.rec` files | Not included (Princeton backup inaccessible) | `SpyglassSpikeGadgetsRecordingInterface` is implemented and wired into `ArcEcephysNWBConverter` — pass `spikegadgets_file_path` to `session_to_nwb()` once `.rec` access is restored. Untested end-to-end (no `.rec` files, no Spyglass `Raw`-table insertion run yet). |
 | PSTH (`rrr4`) — keep or drop? | Currently stored in `processing["ecephys"]["rrr4_psth"]` | Confirm with lab whether it should be published. It significantly increases file size. |
-| Video sync method | Uniform timestamps (nominal 19.98 fps) — no sync signal | Confirm once sync is available; update `SpyglassVideoInterface` |
+| Video sync method | Uniform timestamps from nominal frame rate (~19.98 fps); optional constant offset via `video_time_offset` | Update `SpyglassVideoInterface` when a hardware sync signal is available. |
+
+---
+
+## Video Synchronization
+
+### Current state
+
+Video timestamps are derived from the nominal frame rate (~19.98 fps) reported by the
+MP4 container, starting at t = 0. No hardware sync signal (TTL pulse, LED flash, etc.)
+is available for the current dataset (confirmed by lab, 2026-04-21).
+
+The pipeline exposes a `video_time_offset` parameter in `session_to_nwb()` that shifts
+**all** video timestamps by a constant (seconds). This lets you align the video to the
+behaviour session time-base without any code changes:
+
+```python
+nwb_path = session_to_nwb(
+    behavior_file_path="data_@TaskSwitch6_Marino_P267_221211a.mat",
+    nwb_folder_path="/path/to/output/",
+    video_file_path="video_@TaskSwitch6_Marino_P267_221211a.mp4",
+    video_time_offset=12.5,  # video started 12.5 s after session_start_time
+)
+```
+
+After conversion the `ImageSeries` timestamps in the NWB file will be in seconds
+relative to `nwbfile.session_start_time` (the BControl session clock).
+
+### Estimating the offset from file metadata
+
+When video and behaviour are recorded on the **same machine**, the video file's creation
+timestamp can serve as a rough estimate of when recording started:
+
+```python
+import platform
+from datetime import datetime, timezone
+from pathlib import Path
+
+video_path = Path("video_@TaskSwitch6_Marino_P267_221211a.mp4")
+session_start = nwbfile.session_start_time  # timezone-aware datetime
+
+# macOS exposes true file-creation time via st_birthtime
+if platform.system() == "Darwin":
+    video_start_ts = video_path.stat().st_birthtime
+else:
+    # Linux: no creation time; use mtime minus video duration as fallback
+    import cv2
+    cap = cv2.VideoCapture(str(video_path))
+    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+    video_duration = n_frames / fps
+    video_start_ts = video_path.stat().st_mtime - video_duration
+
+video_start = datetime.fromtimestamp(video_start_ts, tz=timezone.utc)
+time_offset = (video_start - session_start).total_seconds()
+print(f"Estimated video_time_offset: {time_offset:.2f} s")
+```
+
+> **Caveats:**
+> - File timestamps can be unreliable if data were copied between machines (mtime is
+>   typically preserved on `cp -p` / rsync but creation time is reset on Linux).
+> - The estimate assumes the machine clocks were synchronised at recording time.
+> - A constant frame-rate assumption means drift accumulates; for long sessions (>30 min)
+>   even small clock offsets become visible.
+
+### Future: hardware sync
+
+When a hardware sync method is available (TTL pulse on a dedicated channel, sync LED
+visible in the video, etc.), replace the constant offset with per-frame timestamps
+derived from the sync signal. The `SpyglassVideoInterface.add_to_nwbfile()` signature
+already accepts `time_offset: float | None`, so the extension point is clear — replace
+the scalar with an array of real timestamps computed from the sync signal.
+
+The relevant file is:
+`src/pagan_lab_to_nwb/interfaces/spyglass_video_interface.py` — lines 83–85.
 
 ---
