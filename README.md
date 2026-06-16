@@ -58,7 +58,7 @@ Spyglass-compatible (see [Spyglass insertion](#spyglass-insertion) below).
 
 Convert a single session:
 ```bash
-python src/pagan_lab_to_nwb/arc_behavior/convert_session.py
+python src/pagan_lawhy b_to_nwb/arc_behavior/convert_session.py
 ```
 
 Convert, validate, and upload an entire protocol to DANDI in batches:
@@ -109,7 +109,7 @@ electrophysiology (SpikeGadgets), spike-sorted units, an overhead video recordin
 BControl behavior for the same task-switching paradigm as ARC Behavior. The converter
 (`ArcEcephysNWBConverter`) is built to be Spyglass-compatible from the start:
 
-- `DataAcqDevice` + `Probe` + `NwbElectrodeGroup` hierarchy (named `nTrode{N}`) with
+- `DataAcqDevice` + `Probe` + `NwbElectrodeGroup` hierarchy (named `tetrode{N}`) with
   the Spyglass-required electrode columns (`probe_shank`, `probe_electrode`,
   `bad_channel`, `ref_elect_id`, `group_name`, `brain_area`)
 - Video stored as `ImageSeries(external_file=[...])`

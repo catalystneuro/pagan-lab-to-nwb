@@ -44,6 +44,44 @@ See `README.md` for the overall pipeline description.
 
 ---
 
+## Raw ephys recording (`*.rec`) → `SpyglassSpikeGadgetsRecordingInterface`
+
+> **Status: implemented but untested** — no `.rec` files are available yet (see
+> `open_questions.md` Q5). Optional; only runs when `spikegadgets_file_path` is passed to
+> `session_to_nwb()`. Must run before `SpikeSortingMatInterface` so the electrode table is
+> shared between the two.
+
+Source format: SpikeGadgets `.rec` (XML `<Configuration>` header + binary trace data), read
+via NeuroConv's `SpikeGadgetsRecordingInterface`.
+
+### Devices (`nwbfile.devices`)
+
+| Source | NWB object | Metadata source |
+|---|---|---|
+| — | `DataAcqDevice("HH128")` | `metadata/_spike_sorting_mat_metadata.yaml` → `Ecephys.DataAcqDevice` (shared with `SpikeSortingMatInterface`) |
+| — | `Probe("tetrode_array")` → `Shank("0")` → `ShanksElectrode("0".."3")` | `metadata/_spike_sorting_mat_metadata.yaml` → `Ecephys.Probe` (shared) |
+
+### Electrode groups and electrodes
+
+| Source | NWB destination | Notes |
+|---|---|---|
+| `.rec` header `<SpikeNTrode id=...>` → `<SpikeChannel hwChan=...>` | `NwbElectrodeGroup("tetrode{N}")` per `SpikeNTrode/@id` | One group per tetrode; `location="unknown"` **⚠ placeholder** |
+| Hardware-channel → (tetrode, intra-tetrode index) map parsed from the header | `nwbfile.electrodes` rows (one per recorded channel) | `probe_shank=0`, `probe_electrode=0..3`, `bad_channel=False`, `ref_elect_id=-1` |
+
+### Acquisition (`nwbfile.acquisition`)
+
+| Source | NWB destination | Notes |
+|---|---|---|
+| Raw int16 traces, all channels | `ElectricalSeriesRaw` (`ElectricalSeries`) | `conversion` = channel gain (µV/count × 1e-6); chunked + gzip via `DataChunkIterator`/`H5DataIO`; explicit `timestamps` (Spyglass requires `always_write_timestamps=True`) |
+| Recording duration | `nwbfile.epochs` `[0.0, duration]`, `tags=["01"]` | Only added if `nwbfile.epochs` is still empty (shared with `SpikeSortingMatInterface`) |
+
+**Interaction with `SpikeSortingMatInterface`:** when both interfaces run, `SpikeGadgets` runs
+first and creates the electrode table; `SpikeSorting` detects the pre-existing rows (matched
+via `tetrode{N}` electrode-group naming) and maps sorted units onto them instead of adding
+duplicate rows.
+
+---
+
 ## Spike sorting (`spikes_@*.mat`) → `SpikeSortingMatInterface`
 
 Source format: MATLAB v7.3 / HDF5. All datasets accessed via h5py.

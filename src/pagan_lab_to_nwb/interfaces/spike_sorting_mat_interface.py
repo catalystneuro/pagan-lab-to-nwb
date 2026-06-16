@@ -265,7 +265,7 @@ class SpikeSortingMatInterface(BaseDataInterface):
 
         # Build a lookup: trode_id → index of its first electrode row.
         # If the electrode table already has rows (e.g., populated by
-        # PaganLabSpikeGadgetsRecordingInterface), reuse them rather than
+        # SpyglassSpikeGadgetsRecordingInterface), reuse them rather than
         # adding duplicate rows.  This allows both interfaces to coexist when
         # SpikeGadgets is listed first in data_interface_classes.
         if nwbfile.electrodes is not None and len(nwbfile.electrodes) > 0:

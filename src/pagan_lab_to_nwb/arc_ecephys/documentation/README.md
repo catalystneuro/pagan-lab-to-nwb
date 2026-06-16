@@ -37,15 +37,25 @@ to skip that stream.
 | Stream | Source format | File pattern | NWB destination | Converter key |
 |---|---|---|---|---|
 | BControl behavior | MATLAB v5 `.mat` | `data_@{protocol}_{exp}_{sub}_{date}.mat` | `nwbfile.trials`, `lab_meta_data["task"]`, optogenetics | `Behavior` |
+| Raw ephys recording | SpikeGadgets `.rec` | `*.rec` | `nwbfile.acquisition["ElectricalSeriesRaw"]`, `nwbfile.electrodes`, `nwbfile.electrode_groups`, devices | `SpikeGadgets` |
 | Spike sorting | MATLAB v7.3 (HDF5) `.mat` | `spikes_@{protocol}_{exp}_{sub}_{date}.mat` | `nwbfile.units`, `nwbfile.electrodes`, `nwbfile.electrode_groups` | `SpikeSorting` |
 | Processed trials | MATLAB v5 `.mat` | `dati_{protocol}_{exp}_{sub}_{date}.mat` | `processing["behavior"]["processed_trials"]` (TimeIntervals) | `ProcessedTrials` |
 | Behavioral video | MP4 | `video_@{protocol}_{exp}_{sub}_{date}.mp4` | `processing["behavior"]["video"]` (ImageSeries) | `Video` |
 
+> **Status:** the `SpikeGadgets` stream (`SpyglassSpikeGadgetsRecordingInterface`,
+> `spikegadgets_file_path`) is implemented but **untested end-to-end** — no `.rec`
+> files are available yet (see `open_questions.md` Q5).
+
 **Interface order matters** (enforced by `ArcEcephysNWBConverter`):
 1. `Behavior` — creates `nwbfile.trials` (required by `ProcessedTrials`)
-2. `SpikeSorting` — creates `nwbfile.units`, electrodes, `Probe`/`DataAcqDevice` devices, and the `behavior` processing module
-3. `ProcessedTrials` — appends columns to the behavior processing module
-4. `Video` — adds `CameraDevice` and `ImageSeries` to the behavior processing module
+2. `SpikeGadgets` *(optional)* — writes raw `ElectricalSeriesRaw` to acquisition and creates
+   the `DataAcqDevice`/`Probe`/`NwbElectrodeGroup` hierarchy plus the electrode table.
+   Must run before `SpikeSorting` so the electrode table can be shared.
+3. `SpikeSorting` — creates `nwbfile.units` and the `behavior` processing module; reuses the
+   electrode table from `SpikeGadgets` if present, otherwise builds its own electrodes,
+   `Probe`/`DataAcqDevice` devices, and electrode groups
+4. `ProcessedTrials` — appends columns to the behavior processing module
+5. `Video` — adds `CameraDevice` and `ImageSeries` to the behavior processing module
 
 ---
 
@@ -56,18 +66,20 @@ nwbfile
 ├── session_description        "This session contains ..."
 ├── lab_meta_data["task"]      ndx-structured-behavior Task
 │                              (StateTypes, EventTypes, ActionTypes, TaskArguments)
+├── acquisition
+│   └── ElectricalSeriesRaw    Raw broadband signal, all tetrode channels  [SpikeGadgets, optional]
 ├── devices
-│   ├── HH128                  DataAcqDevice (SpikeGadgets HH128)         [SpikeSorting]
-│   ├── tetrode_array          Probe → Shank → ShanksElectrode × 4       [SpikeSorting]
+│   ├── HH128                  DataAcqDevice (SpikeGadgets HH128)         [SpikeGadgets/SpikeSorting]
+│   ├── tetrode_array          Probe → Shank → ShanksElectrode × 4       [SpikeGadgets/SpikeSorting]
 │   └── camera_device 1        CameraDevice (top_camera)                  [Video]
-├── electrode_groups           NwbElectrodeGroup per tetrode              [SpikeSorting]
-├── electrodes                 4 ch × n_tetrodes; probe_shank, probe_electrode,
-│                              bad_channel, ref_elect_id                   [SpikeSorting]
+├── electrode_groups           NwbElectrodeGroup per tetrode (tetrode{N})  [SpikeGadgets/SpikeSorting]
+├── electrodes                 1 row per recorded channel; probe_shank, probe_electrode,
+│                              bad_channel, ref_elect_id                   [SpikeGadgets/SpikeSorting]
 ├── units                      spike_times, waveform_mean, waveform_sd,
 │                              trode_id per sorted unit                    [SpikeSorting]
 ├── trials                     BControl trial structure (from Behavior),
 │                              plus BControl stimulus columns
-├── epochs                     One interval [0, max_spike_time]           [SpikeSorting]
+├── epochs                     One interval [0, max_spike_time]           [SpikeGadgets/SpikeSorting]
 ├── time_intervals["goodp"]    Usable recording window from spike sorter  [SpikeSorting]
 └── processing
     ├── behavior
@@ -143,8 +155,11 @@ whenever you need to re-run after a partial or failed insertion.
 | `SortedSpikesGroup` | created from ImportedSpikeSorting | P100 |
 | `UnitAnnotation` | `trode_id` per unit | P100 |
 | `ProcessedTrials` (custom) | `processing["behavior"]["processed_trials"]` | P100 |
+| `Raw` | `acquisition["ElectricalSeriesRaw"]` (`SpikeGadgets` interface, when `spikegadgets_file_path` is given) | Not yet exercised — no `.rec` files available (see open_questions.md Q5) |
 
-**Not yet populated:** `Raw`, `LFP` (raw `.rec` files not included — see open_questions.md Q5).
+**Not yet populated:** `LFP` (no LFP data in source files). `Raw` has a code path via the
+`SpikeGadgets` interface but is untested end-to-end — no `.rec` files available yet (see
+open_questions.md Q5).
 
 ---
 
@@ -196,7 +211,7 @@ production DANDI upload or before the Spyglass database is used for analysis.
 
 | Item | Status | Action |
 |---|---|---|
-| Raw SpikeGadgets `.rec` files | Not included (Princeton backup inaccessible) | Pass `raw_rec_file_path` to `session_to_nwb()` when access is restored (stub comment already in `convert_session.py`) |
+| Raw SpikeGadgets `.rec` files | Not included (Princeton backup inaccessible) | `SpyglassSpikeGadgetsRecordingInterface` is implemented and wired into `ArcEcephysNWBConverter` — pass `spikegadgets_file_path` to `session_to_nwb()` once `.rec` access is restored. Untested end-to-end (no `.rec` files, no Spyglass `Raw`-table insertion run yet). |
 | PSTH (`rrr4`) — keep or drop? | Currently stored in `processing["ecephys"]["rrr4_psth"]` | Confirm with lab whether it should be published. It significantly increases file size. |
 | Video sync method | Uniform timestamps (nominal 19.98 fps) — no sync signal | Confirm once sync is available; update `SpyglassVideoInterface` |
 

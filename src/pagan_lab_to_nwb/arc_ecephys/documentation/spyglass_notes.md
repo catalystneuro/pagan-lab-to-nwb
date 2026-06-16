@@ -23,6 +23,7 @@ behavior (`data_@*.mat`), and behavioral video (`.mp4`).
 | Spike-sorted units | MATLAB v7.3 (HDF5) | `spikes_@{...}.mat` | Electrode / Units |
 | Processed trial+neural data | MATLAB v5 `.mat` | `dati_{...}.mat` | Trials (extra cols) |
 | Behavioral video | MP4 | `video_@{...}.mp4` | VideoFile |
+| Raw ephys recording | SpikeGadgets `.rec` | `*.rec` | Raw (`ElectricalSeriesRaw`) — `SpyglassSpikeGadgetsRecordingInterface` added 2026-05-19, untested (no `.rec` files yet) |
 
 ---
 
@@ -55,7 +56,9 @@ behavior (`data_@*.mat`), and behavioral video (`.mp4`).
 - [x] `Probe` ← `Probe` + `Shank` + `ShanksElectrode` hierarchy in `nwbfile.devices`
 - [x] `ElectrodeGroup` ← `NwbElectrodeGroup` with targeted_location/xyz/units
 - [x] `Electrode` ← electrodes table with probe_shank, probe_electrode, bad_channel, ref_elect_id
-- [ ] `Raw` — not populated (raw `.rec` files not included; see open_questions.md Q5)
+- [ ] `Raw` — `SpyglassSpikeGadgetsRecordingInterface` (added 2026-05-19, `add_spikegadgets_code`
+      branch) writes `ElectricalSeriesRaw` to acquisition when `spikegadgets_file_path` is
+      given; not yet exercised end-to-end (no `.rec` files available — see open_questions.md Q5)
 - [ ] `LFP` — not populated (LFP data not in source files)
 - [x] `CameraDevice` ← `CameraDevice` (ndx-franklab-novela) in `nwbfile.devices`
 - [x] `TaskEpoch` ← `nwbfile.epochs` + `processing["tasks"]` DynamicTable
@@ -67,6 +70,8 @@ behavior (`data_@*.mat`), and behavioral video (`.mp4`).
 
 ```
 nwbfile
+├── acquisition
+│   └── ElectricalSeriesRaw  Raw broadband signal, all tetrode channels   [ephys, raw .rec only]
 ├── devices
 │   ├── SpikeGadgets    DataAcqDevice (system, amplifier, adc_circuit)   [ephys]
 │   ├── tetrode_array   Probe → Shank → ShanksElectrode                  [ephys]
@@ -476,7 +481,11 @@ See `open_questions.md` for full details.
 **Resolved (2026-04-21):**
 - Q1 ✓ `tim` row labels confirmed
 - Q3/Q10 ✓ No sync signal — nominal timestamps are final
-- Q5 ✓ Raw `.rec` files not currently accessible; mat-only pipeline is final for now
+- Q5 ✓ Raw `.rec` files not currently accessible; mat-only pipeline is final for now.
+  Update (2026-05-19): `SpyglassSpikeGadgetsRecordingInterface` + `spikegadgets_file_path`
+  implemented on `add_spikegadgets_code` so `.rec` files can be added with no further code
+  changes once access is restored — but this path is untested (no `.rec` files, no Spyglass
+  `Raw`-table insertion run yet)
 - Q6 ✓ Correct behavior file received and used (`181010a`)
 - Q7 (partial) ✓ Device is HH128 (SpikeGadgets); amplifier/ADC chip unconfirmed (assumed Intan)
 
