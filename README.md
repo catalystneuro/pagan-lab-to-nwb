@@ -58,7 +58,7 @@ Spyglass-compatible (see [Spyglass insertion](#spyglass-insertion) below).
 
 Convert a single session:
 ```bash
-python src/pagan_lawhy b_to_nwb/arc_behavior/convert_session.py
+python src/pagan_lab_to_nwb/arc_behavior/convert_session.py
 ```
 
 Convert, validate, and upload an entire protocol to DANDI in batches:
