@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
+import numpy as np
 from ndx_franklab_novela import CameraDevice
+from numpy.typing import NDArray
 from pydantic import validate_call
 from pynwb.file import NWBFile
 from pynwb.image import ImageSeries
@@ -34,6 +36,20 @@ class SpyglassVideoInterface(BaseDataInterface):
     def __init__(self, file_path: Path, verbose: bool = False):
         super().__init__(file_path=file_path)
         self.verbose = verbose
+        self._aligned_timestamps: NDArray[np.float64] | None = None
+
+    def set_aligned_timestamps(self, timestamps: NDArray[np.float64]) -> None:
+        """Set per-frame timestamps in seconds (session clock).
+
+        Call this before conversion when you have a hardware sync signal or any
+        other source of per-frame timing.  The array must have one entry per
+        video frame and be expressed in the same time base as
+        ``nwbfile.session_start_time`` (i.e. seconds since session start).
+
+        If not called, timestamps are derived from the nominal frame rate and
+        optionally shifted by ``time_offset`` in ``add_to_nwbfile()``.
+        """
+        self._aligned_timestamps = np.asarray(timestamps, dtype=np.float64)
 
     def get_metadata(self) -> DeepDict:
         metadata = super().get_metadata()
@@ -80,9 +96,12 @@ class SpyglassVideoInterface(BaseDataInterface):
             camera_device = nwbfile.devices[camera_meta["name"]]
 
         video_file_path = self.source_data["file_path"]
-        timestamps = get_video_timestamps(file_path=video_file_path)
-        if time_offset is not None:
-            timestamps = timestamps + time_offset
+        if self._aligned_timestamps is not None:
+            timestamps = self._aligned_timestamps
+        else:
+            timestamps = get_video_timestamps(file_path=video_file_path)
+            if time_offset is not None:
+                timestamps = timestamps + time_offset
 
         nwbfile.add_epoch_column(name="task_name", description="Name of the task associated with the epoch.")
         nwbfile.add_epoch(start_time=timestamps[0], stop_time=timestamps[-1], tags=["01"], task_name=protocol)

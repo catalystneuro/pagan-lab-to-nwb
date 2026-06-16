@@ -327,15 +327,26 @@ print(f"Estimated video_time_offset: {time_offset:.2f} s")
 > - A constant frame-rate assumption means drift accumulates; for long sessions (>30 min)
 >   even small clock offsets become visible.
 
-### Future: hardware sync
+### Per-frame timestamps (hardware sync or any external source)
 
-When a hardware sync method is available (TTL pulse on a dedicated channel, sync LED
-visible in the video, etc.), replace the constant offset with per-frame timestamps
-derived from the sync signal. The `SpyglassVideoInterface.add_to_nwbfile()` signature
-already accepts `time_offset: float | None`, so the extension point is clear — replace
-the scalar with an array of real timestamps computed from the sync signal.
+If the lab ever acquires a per-frame sync signal (TTL pulse, sync LED, etc.),
+`SpyglassVideoInterface.set_aligned_timestamps()` accepts a numpy array of
+per-frame timestamps (seconds, same clock as `nwbfile.session_start_time`):
 
-The relevant file is:
-`src/pagan_lab_to_nwb/interfaces/spyglass_video_interface.py` — lines 83–85.
+```python
+import numpy as np
+from pagan_lab_to_nwb.interfaces.spyglass_video_interface import SpyglassVideoInterface
+
+# Your per-frame timestamps in seconds (one entry per video frame,
+# in the same time base as nwbfile.session_start_time).
+aligned_timestamps = np.load("video_sync_timestamps.npy")
+
+interface = SpyglassVideoInterface(file_path="video_@TaskSwitch6_Marino_P267_221211a.mp4")
+interface.set_aligned_timestamps(aligned_timestamps)
+# Pass the interface directly to the converter rather than using session_to_nwb().
+```
+
+When `set_aligned_timestamps()` has been called, `session_to_nwb(video_time_offset=...)`
+is ignored — the stored per-frame array takes precedence.
 
 ---
