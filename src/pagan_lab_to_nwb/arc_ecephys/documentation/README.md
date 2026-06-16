@@ -184,28 +184,76 @@ Per-subject fields (`date_of_birth`) are injected from `arc_behavior/rat_informa
 
 The items below use prototype/placeholder values and **must be updated** before a
 production DANDI upload or before the Spyglass database is used for analysis.
+All changes are pure YAML edits — no Python code needs to be touched.
 
-### Critical (affects data integrity)
+### Tetrode → brain region mapping
 
-| Field | Placeholder | Why it matters | Where to fix |
-|---|---|---|---|
-| `NwbElectrodeGroup.location` | `"unknown"` for all 32 tetrodes | Electrode location is required for meaningful analysis and DANDI compliance | `SpikeSortingMatInterface.add_to_nwbfile()` — provide a dict mapping tetrode ID → brain region |
-| `Probe.contact_size` | `0.0125` mm (12.5 µm, typical nichrome tetrode wire) | Wire diameter in mm; required by ndx-franklab-novela and Spyglass Probe table. Must be a real number — `nan`/`None` breaks Spyglass `Probe.Electrode` re-insertion (see `open_questions.md` Q8 and `spyglass_notes.md`) | `metadata/_spike_sorting_mat_metadata.yaml` → `Ecephys.Probe.contact_size` |
+**File to edit:** `src/pagan_lab_to_nwb/metadata/_spike_sorting_mat_metadata.yaml`
 
-### Hardware metadata (confirm with lab)
+Find the `tetrode_locations` key and replace `{}` with a dict mapping each tetrode
+number (1–32) to its brain region string:
 
-| Field | Placeholder | Where to fix |
-|---|---|---|
-| `DataAcqDevice.amplifier` / `adc_circuit` | `"Horizontal Headstage 128-Channel Datalogger"` (assumed — unit is integrated) | `metadata/_spike_sorting_mat_metadata.yaml` |
-| `CameraDevice.meters_per_pixel` | `0.001` | `metadata/_video_metadata.yaml` |
-| `CameraDevice.lens` | `"unknown"` | `metadata/_video_metadata.yaml` |
+```yaml
+tetrode_locations:
+  1: "PFC"
+  2: "PFC"
+  9: "Striatum"
+  10: "Striatum"
+  # ... add all 32 tetrodes
+```
 
-### Spyglass-specific (confirm with database admin)
+Any tetrode number not listed falls back to `tetrode_location_default` (currently
+`"unknown"`). If the mapping **differs between animals**, add an `Ecephys.tetrode_locations`
+override to `src/pagan_lab_to_nwb/arc_ecephys/metadata.yaml` for the sessions that differ
+— the per-session YAML is merged on top of the shared metadata at conversion time.
 
-| Field | Placeholder | Action needed |
-|---|---|---|
-| `CameraDevice.camera_name` | `"top_camera"` | Must match an existing entry in the Spyglass `sgc.CameraDevice` table. Check what name the lab uses and update `metadata/_video_metadata.yaml`. |
-| `CameraDevice.camera_id` | `1` (hardcoded in `insert_session.py`) | Must match the auto-incremented ID assigned by the database. Confirm after seeding. |
+### Probe contact size (wire diameter)
+
+**File to edit:** `src/pagan_lab_to_nwb/metadata/_spike_sorting_mat_metadata.yaml`
+
+```yaml
+Ecephys:
+  Probe:
+    contact_size: 0.0125   # ← replace with actual wire diameter in mm
+```
+
+> Must be a real number — `nan`/`None` breaks Spyglass `Probe.Electrode` re-insertion.
+> See `open_questions.md` Q8 and `spyglass_notes.md` for details.
+
+### Camera metadata
+
+**File to edit:** `src/pagan_lab_to_nwb/metadata/_video_metadata.yaml`
+
+```yaml
+Video:
+  CameraDevice:
+    manufacturer: unknown      # ← replace with manufacturer name if available
+    lens: unknown              # ← replace with lens model / focal length
+    meters_per_pixel: 0.001   # ← replace with (cage_width_m / frame_width_px)
+    camera_name: top_camera   # ← must match the name in the lab's Spyglass sgc.CameraDevice table
+```
+
+`meters_per_pixel` can be estimated from a known object in the frame: divide the
+object's real width (metres) by its width in pixels.
+
+`camera_name` must exactly match a row already registered in the Spyglass
+`sgc.CameraDevice` table. If the table is empty, insert the desired name first, then
+update this field to match.
+
+### Hardware identifiers (lower priority)
+
+**File to edit:** `src/pagan_lab_to_nwb/metadata/_spike_sorting_mat_metadata.yaml`
+
+```yaml
+Ecephys:
+  DataAcqDevice:
+    amplifier: "Horizontal Headstage 128-Channel Datalogger"   # ← confirm or correct
+    adc_circuit: "Horizontal Headstage 128-Channel Datalogger" # ← confirm or correct
+```
+
+These are currently assumed from the HH128 product description (confirmed by lab that
+amplifier and ADC are integrated in the same unit). Only update if the lab identifies
+a more specific part name.
 
 ### Data availability
 

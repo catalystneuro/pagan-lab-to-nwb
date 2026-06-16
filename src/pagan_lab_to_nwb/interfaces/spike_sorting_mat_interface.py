@@ -232,16 +232,19 @@ class SpikeSortingMatInterface(BaseDataInterface):
             probe = nwbfile.devices[probe_meta["name"]]
 
         # ---- NwbElectrodeGroups — one per tetrode (Spyglass: ElectrodeGroup.make()) ----
-        # TODO (open_questions Q2): replace "unknown" with actual brain region per tetrode
+        ecephys_meta = metadata.get("Ecephys", {})
+        location_map = ecephys_meta.get("tetrode_locations", {})
+        default_location = ecephys_meta.get("tetrode_location_default", "unknown")
         for trode_id in unique_trodes:
             group_name = f"tetrode{trode_id}"
+            brain_region = location_map.get(trode_id, default_location)
             if group_name not in nwbfile.electrode_groups:
                 group = NwbElectrodeGroup(
                     name=group_name,
                     description=f"Tetrode {trode_id}",
-                    location="unknown",  # placeholder — see open_questions.md Q2
+                    location=brain_region,
                     device=probe,  # must point to Probe, not DataAcqDevice
-                    targeted_location="unknown",  # placeholder — see open_questions.md Q2
+                    targeted_location=brain_region,
                     targeted_x=float("nan"),
                     targeted_y=float("nan"),
                     targeted_z=float("nan"),
@@ -284,7 +287,7 @@ class SpikeSortingMatInterface(BaseDataInterface):
                 for ch in range(n_channels_per_tetrode):
                     nwbfile.add_electrode(
                         group=group,
-                        location="unknown",  # placeholder — see open_questions.md Q2
+                        location=brain_region,
                         filtering="none",
                         probe_shank=0,  # tetrodes have 1 shank → shank 0
                         probe_electrode=ch,  # 0–3 within tetrode
