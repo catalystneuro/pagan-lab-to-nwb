@@ -1,6 +1,6 @@
 # Conversion & Upload Progress — Pagan Lab → DANDI:001550
 
-**Last updated:** 2026-04-15
+**Last updated:** 2026-06-16
 
 ---
 
@@ -8,12 +8,12 @@
 
 | | Count |
 |---|---|
-| Local NWB files converted | **16,113** |
-| Files on DANDI (001550) | **16,113** |
+| Local NWB files converted | **16,115** |
+| Files on DANDI (001550) | **16,115** |
 | Total source .mat files | ~16,206 |
-| Intentionally excluded | ~93 |
+| Intentionally excluded | ~91 |
 
-**Upload is complete.** All 16,113 converted NWB files are on DANDI.
+**Upload is complete.** All 16,115 converted NWB files are on DANDI.
 
 **Note:** The nwbinspector crash (IndexError on empty HDF5 datasets — issue #5 in `conversion_issues.md`) affects 8 specific files that are on DANDI, uploaded with `--validation ignore`. These are valid files; the crash is a known nwbinspector 0.7.1 bug.
 
@@ -23,7 +23,7 @@
 
 | Protocol | Source .mat | Converted NWB | Excluded | Exclusion reason |
 |---|---|---|---|---|
-| TaskSwitch6 | 1,565 | 1,548 | 17 | See §Exclusions below |
+| TaskSwitch6 | 1,565 | 1,550 | 15 | See §Exclusions below |
 | TaskSwitch4 | 13,841 | 13,777 | 64 | 61 "Ended at" aborts, 3 zero-trial |
 | TaskSwitch2 | 201 | 201 | 0 | All converted after null-byte + mixed-type fixes |
 | TaskSwitch3 | 112 | 111 | 1 | "Ended at" abort |
@@ -34,7 +34,7 @@
 | PBups | 75 | 73 | 2 | "Ended at" aborts |
 | ProAnti3 | 16 | 16 | 0 | Complete |
 | TaskSwitch | 19 | 19 | 0 | Complete |
-| **Total** | **~16,206** | **16,113** | **~93** | |
+| **Total** | **~16,206** | **16,115** | **~91** | |
 
 ---
 
@@ -52,9 +52,9 @@ re-converted after the fix was applied and their NWB files exist on disk.
 
 ---
 
-## TaskSwitch6 — Exclusion Breakdown (17 files)
+## TaskSwitch6 — Exclusion Breakdown (15 files)
 
-All 17 excluded TaskSwitch6 sessions are confirmed:
+All 15 excluded TaskSwitch6 sessions are confirmed:
 
 | Subject | File | Reason |
 |---|---|---|
@@ -63,11 +63,11 @@ All 17 excluded TaskSwitch6 sessions are confirmed:
 | P131 | 190807a, 191023a | "Ended at" abort |
 | P127 | 190610a | "Ended at" abort |
 | P116 | 190719a, 190607a | "Ended at" abort |
-| P124 | 190726a | AssertionError: empty ragged column data (data anomaly, issue #10) |
-| P131 | 190617a | TypeError: 'int' object is not iterable (data anomaly, issue #10) |
 
-**15 of 17 are "Ended at" aborts.** The remaining 2 (P124 and P131_190617a) are
-data-specific anomalies documented in `conversion_issues.md §10`.
+**All 15 are "Ended at" aborts** (no trial data). The two data-anomaly sessions previously
+listed as excluded (P124/190726a — AssertionError; P131/190617a — TypeError) were
+subsequently fixed by the same code fixes applied to TaskSwitch4 anomalies and are now
+on DANDI. See `conversion_issues.md §10` for the original anomaly details.
 
 ---
 

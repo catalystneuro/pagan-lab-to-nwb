@@ -37,3 +37,18 @@ Ecephys:
     units: mm
     probe_description: "32-tetrode array (SpikeGadgets, Pagan Lab)"
     contact_size: 0.0125  # 12.5 um, typical nichrome tetrode wire. TODO (open_questions.md Q8): confirm with lab.
+
+  # Tetrode → brain region mapping.
+  # Fill in once the lab provides the surgical map (open_questions.md Q2).
+  # Keys are tetrode numbers (int); values are brain region strings (str).
+  # Any tetrode not listed falls back to tetrode_location_default.
+  # If the mapping varies per animal, override tetrode_locations in
+  # arc_ecephys/metadata.yaml using the same dict format.
+  tetrode_location_default: "unknown"
+  tetrode_locations: {}
+  # Example (replace {} above with the actual map):
+  #   tetrode_locations:
+  #     1: "PFC"
+  #     2: "PFC"
+  #     9: "Striatum"
+  #     10: "Striatum"

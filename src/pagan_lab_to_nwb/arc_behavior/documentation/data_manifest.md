@@ -113,11 +113,27 @@ NWBFile
 ├── devices
 │   ├── BControl (Device)
 │   │   └── manufacturer  ← "Example Manufacturer" (default)
-│   └── Cerebro (Device)                          ← opto sessions only
-│       └── manufacturer  ← "Karpova Lab"
+│   ├── Cerebro (ExcitationSource)                ← opto sessions only; ndx-optogenetics
+│   │   ├── manufacturer  ← "Karpova Lab"
+│   │   └── power_in_W    ← 0.025
+│   ├── cerebro_model (ExcitationSourceModel)     ← opto sessions only; ndx-optogenetics
+│   │   ├── source_type   ← "Solid-State Laser"
+│   │   ├── excitation_mode ← "one-photon"
+│   │   └── wavelength_range_in_nm ← [450.0, 450.0]
+│   ├── optical_fiber_left (OpticalFiber)         ← opto sessions only; ndx-ophys-devices
+│   │   └── fiber_insertion (FiberInsertion)
+│   │       ├── insertion_position_ap_in_mm ← 2.0
+│   │       └── insertion_position_ml_in_mm ← -1.3
+│   ├── optical_fiber_right (OpticalFiber)        ← opto sessions only; ndx-ophys-devices
+│   │   └── fiber_insertion (FiberInsertion)
+│   │       ├── insertion_position_ap_in_mm ← 2.0
+│   │       └── insertion_position_ml_in_mm ← 1.3
+│   └── fof_fiber_model (OpticalFiberModel)       ← opto sessions only; ndx-ophys-devices
+│       ├── numerical_aperture   ← 0.37
+│       └── core_diameter_in_um  ← 400.0
 │
 ├── lab_meta_data
-│   └── task (Task)                          ← ndx-structured-behavior
+│   ├── task (Task)                          ← ndx-structured-behavior
 │       ├── state_types (StateTypesTable)
 │       │   └── state_name [VectorData/text]  ← all state names from first trial
 │       ├── event_types (EventTypesTable)
@@ -130,6 +146,17 @@ NWBFile
 │           ├── expression       [VectorData/text]
 │           ├── expression_type  [VectorData/text]  ← "integer","float","string","array","json"
 │           └── output_type      [VectorData/text]  ← "numeric","text"
+│   └── optogenetic_experiment_metadata (OptogeneticExperimentMetadata)  ← opto sessions only; ndx-optogenetics
+│       ├── optogenetic_sites_table (OptogeneticSitesTable)
+│       │   ├── row 0  optical_fiber=optical_fiber_left,  excitation_source=Cerebro, effector=ChR2
+│       │   └── row 1  optical_fiber=optical_fiber_right, excitation_source=Cerebro, effector=ChR2
+│       ├── optogenetic_effectors (OptogeneticEffectors)
+│       │   └── ChR2 (Effector)                         ← Channelrhodopsin-2 opsin
+│       ├── optogenetic_viruses (OptogeneticViruses)
+│       │   └── aav_mdlx_chr2_mcherry (ViralVector)     ← AAV2/5-mDlx-ChR2-mCherry
+│       └── optogenetic_virus_injections (OptogeneticVirusInjections)
+│           ├── injection_fof_left (ViralVectorInjection)   ← FOF, +2 mm AP, -1.3 mm ML
+│           └── injection_fof_right (ViralVectorInjection)  ← FOF, +2 mm AP, +1.3 mm ML
 │
 ├── acquisition
 │   └── task_recording (TaskRecording)        ← ndx-structured-behavior
@@ -148,25 +175,20 @@ NWBFile
 │           ├── value       [VectorData/text]     ← state name when wave started
 │           └── action_type [DynamicTableRegion]  → ActionTypesTable row index
 │
-├── ogen_sites                                    ← opto sessions only
-│   ├── opto_site_left (OptogeneticStimulusSite)
-│   │   ├── excitation_lambda  ← 450.0 nm (blue light, ChR2)
-│   │   └── location           ← "FOF, left hemisphere"
-│   └── opto_site_right (OptogeneticStimulusSite)
-│       ├── excitation_lambda  ← 450.0 nm
-│       └── location           ← "FOF, right hemisphere"
-│
-├── stimulus                                      ← opto sessions only
-│   ├── optogenetic_series_left (OptogeneticSeries)
-│   │   ├── data        ← power in watts: 0.025 W if raw >= 800, else 0.0 W
-│   │   ├── unit        ← "watts"
-│   │   ├── timestamps  ← step-function: [t_on, t_off, ...] pairs
-│   │   └── site        → opto_site_left
-│   └── optogenetic_series_right (OptogeneticSeries)
-│       ├── data        ← power in watts: 0.025 W if raw >= 800, else 0.0 W
-│       ├── unit        ← "watts"
-│       ├── timestamps  ← step-function: [t_on, t_off, ...] pairs
-│       └── site        → opto_site_right
+├── intervals
+│   └── opto_epochs (OptogeneticEpochsTable)      ← opto sessions only; ndx-optogenetics
+│       ├── start_time                ← cpoke_start + window_start (seconds)
+│       ├── stop_time                 ← cpoke_start + window_stop (seconds)
+│       ├── stimulation_on            ← True for all rows
+│       ├── pulse_length_in_ms        ← window duration: 1300, 650, or 650 ms
+│       ├── period_in_ms              ← same as pulse_length_in_ms (single pulse)
+│       ├── number_pulses_per_pulse_train ← 1
+│       ├── number_trains             ← 1
+│       ├── intertrain_interval_in_ms ← NaN (not applicable for single pulse)
+│       ├── power_in_mW               ← 25.0
+│       ├── wavelength_in_nm          ← 450.0
+│       └── optogenetic_sites [DynamicTableRegion] → OptogeneticSitesTable rows
+│                             0 = optical_fiber_left, 1 = optical_fiber_right
 │
 └── trials (TrialsTable)                      ← ndx-structured-behavior
     ├── start_time     [VectorData/float64]   ← state_0 enter time
@@ -203,7 +225,7 @@ NWBFile
     ├── OptoSection_opto_connected [VectorData/int]    ← 1 = Cerebro connected, 0 = not
     ├── OptoSection_opto_type      [VectorData/text]   ← 'Full Trial' / 'First Half' / 'Second Half'
     │   NOTE: opto_left_power / opto_right_power are NOT stored here — see §10 for rationale
-    │         and how to recover per-trial hemisphere stimulation from OptogeneticSeries.
+    │         and how to recover per-trial hemisphere stimulation from opto_epochs.
     │
     └── {ProtocolParam}_* [VectorData]        ← per-trial task parameters from saved_history
 ```
@@ -638,8 +660,10 @@ identified a session-specific threshold for 25 mW output.
 - Raw Cerebro value **< 800** → laser was off → **0 mW (0 W)**
 
 **Implementation in `interfaces/_optogenetics.py`:**
-- `OptogeneticSeries.data` stores values in **watts** (`0.025` or `0.0`)
-- `OptogeneticSeries.unit = "watts"` (NWB SI convention)
+- Per-trial stimulation timing and hemisphere are stored in `intervals["opto_epochs"]`
+  (`OptogeneticEpochsTable`, ndx-optogenetics). One row per stimulated trial.
+- Rich hardware metadata (fiber specs, virus, injection coordinates) is stored in
+  `lab_meta_data["optogenetic_experiment_metadata"]` (`OptogeneticExperimentMetadata`).
 
 ---
 
@@ -649,21 +673,19 @@ identified a session-specific threshold for 25 mW output.
 internal units) are **not** stored as trials table columns.
 
 **Rationale:** Given the binary conversion rule (raw >= 800 → 25 mW, else 0 mW), the raw
-values carry no information beyond what is already in `optogenetic_series_left` /
-`optogenetic_series_right`:
+values carry no information beyond what is already in `intervals["opto_epochs"]`:
 
-| Information | Trials columns | OptogeneticSeries (L/R) | OptogeneticEpochsTable |
-|---|---|---|---|
-| Was the laser on this trial? | `opto_connected` ✓ | derivable | — |
-| Which hemisphere was stimulated? | (removed) | ✓ separate L/R series | — |
-| Power in physical units (watts) | (removed) | ✓ 0.025 W or 0 W | ✓ 25 mW |
-| Stimulation window type | `opto_type` ✓ | implicit in timing | implicit in epoch duration |
-| Control trials (no stimulation) | `opto_connected` ✓ | **not encoded** | **not encoded** |
+| Information | Trials columns | `opto_epochs` (OptogeneticEpochsTable) |
+|---|---|---|
+| Was the laser on this trial? | `opto_connected` ✓ | derivable from row presence |
+| Which hemisphere was stimulated? | (removed) | ✓ via `optogenetic_sites` region |
+| Power in physical units | (removed) | ✓ `power_in_mW` = 25.0 |
+| Stimulation window type | `opto_type` ✓ | implicit in `start_time`/`stop_time` |
+| Control trials (no stimulation) | `opto_connected` ✓ | **not encoded** (no row) |
 
-The `OptogeneticSeries` step-function already encodes, for each hemisphere independently,
-exactly when the laser was on and at what power (in watts). Adding the raw values alongside
-would be redundant and potentially confusing (two representations of the same binary fact in
-different units).
+`opto_epochs` already encodes, for each stimulated trial, exactly which hemisphere(s) fired
+and at what power. Adding the raw Cerebro values alongside would be redundant and potentially
+confusing (two representations of the same binary fact in different units).
 
 **What IS kept in the trials table:**
 - `OptoSection_opto_connected` — the only record of which trials were control (Cerebro
@@ -673,57 +695,54 @@ different units).
 
 ---
 
-### How to recover per-trial hemisphere stimulation from `OptogeneticSeries`
+### How to recover per-trial hemisphere stimulation from `opto_epochs`
 
-The `OptogeneticSeries` step-function can be joined back to the trials table using the trial
-start/stop times. Each stimulation interval is encoded as two consecutive samples:
-`(t_on, 0.025 W)` immediately followed by `(t_off, 0.0 W)`.
+`intervals["opto_epochs"]` (`OptogeneticEpochsTable`, ndx-optogenetics) has one row per
+stimulated trial. The `optogenetic_sites` column is a `DynamicTableRegion` pointing into
+`OptogeneticSitesTable` (row 0 = left fiber, row 1 = right fiber).
 
 ```python
 import numpy as np
 import pandas as pd
+import ndx_structured_behavior  # must import before NWBHDF5IO.read()
 from pynwb import NWBHDF5IO
 
-with NWBHDF5IO("sub-H7015_ses-TaskSwitch6-250516a.nwb", "r") as io:
+with NWBHDF5IO("sub-P131_ses-TaskSwitch6-190815a.nwb", "r") as io:
     nwb = io.read()
 
     trials = nwb.trials.to_dataframe()[["start_time", "stop_time",
                                         "OptoSection_opto_connected",
                                         "OptoSection_opto_type"]]
 
-    # ── Extract stimulated-on timestamps from each hemisphere ────────────────
-    # The step function alternates: (t_on, 0.025), (t_off, 0.0), (t_on, 0.025), ...
-    # "on" samples are those where data > 0.
-    for side in ("left", "right"):
-        series = nwb.stimulus[f"optogenetic_series_{side}"]
-        ts = np.array(series.timestamps)
-        data = np.array(series.data)
+    # ── Per-trial hemisphere stimulation from OptogeneticEpochsTable ─────────
+    opto_epochs = nwb.intervals["opto_epochs"].to_dataframe()
 
-        on_mask = data > 0
-        on_times = ts[on_mask]   # one entry per stimulated trial for this hemisphere
-        off_times = ts[~on_mask] # matching offset times
+    # optogenetic_sites is a list of site indices per epoch:
+    #   [0] = left FOF only, [1] = right FOF only, [0, 1] = both hemispheres
+    opto_epochs["stim_left"]  = opto_epochs["optogenetic_sites"].apply(lambda s: 0 in s)
+    opto_epochs["stim_right"] = opto_epochs["optogenetic_sites"].apply(lambda s: 1 in s)
 
-        # Build a lookup: for each trial, was this hemisphere stimulated?
-        # Strategy: find which trial interval each t_on falls in.
-        stim_left_on = np.zeros(len(trials), dtype=bool)
-        for t_on in on_times:
-            in_trial = (trials["start_time"].values <= t_on) & (t_on < trials["stop_time"].values)
-            stim_left_on |= in_trial
+    # Join epochs back to trials by matching epoch start_time to the trial interval
+    trials["stim_left"]  = False
+    trials["stim_right"] = False
+    for _, epoch in opto_epochs.iterrows():
+        in_trial = ((trials["start_time"] <= epoch["start_time"]) &
+                    (epoch["start_time"]   < trials["stop_time"]))
+        trials.loc[in_trial, "stim_left"]  |= epoch["stim_left"]
+        trials.loc[in_trial, "stim_right"] |= epoch["stim_right"]
 
-        trials[f"stim_{side}"] = stim_left_on
-
-    # ── Result: per-trial DataFrame with hemisphere columns ──────────────────
+    # ── Result ───────────────────────────────────────────────────────────────
     # trials["stim_left"]  → True if left FOF was stimulated on this trial
     # trials["stim_right"] → True if right FOF was stimulated on this trial
+    # Trials with opto_connected == 0 have no epoch row → stim_left/right stay False
     print(trials[["OptoSection_opto_connected", "OptoSection_opto_type",
                   "stim_left", "stim_right"]].value_counts())
 ```
 
 **Notes:**
-- Trials where `opto_connected == 0` will have `stim_left = stim_right = False` by
-  construction (no entry in the series for those trials).
-- To get stimulation duration per trial, read the matching `t_off` from the series
-  (`off_times[i]` pairs with `on_times[i]` since the arrays are strictly alternating).
-- `OptogeneticEpochsTable` provides the same intervals in a `TimeIntervals` format with
-  richer metadata fields (`pulse_length_in_ms`, `number_pulses_per_pulse_train`, etc.) and
-  can be used instead of scanning the raw series timestamps.
+- Trials with `opto_connected == 0` have no row in `opto_epochs` and will have
+  `stim_left = stim_right = False` by construction.
+- Stimulation duration per trial: `epoch["stop_time"] - epoch["start_time"]` (seconds),
+  or read `pulse_length_in_ms` directly from the epoch row.
+- Rich stimulation metadata per epoch (wavelength, power, pulse count) is in the
+  `opto_epochs` columns — no need to inspect device objects for these values.

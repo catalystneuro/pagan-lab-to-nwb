@@ -70,11 +70,15 @@ For the initial release, the spike-sorted `.mat` files (`spikes_@*.mat`) are the
 authoritative source and will be published on DANDI.
 
 **Future plan:** The lab wants the conversion script to make it easy to add `.rec` files
-when full Princeton access is restored. A `SpikeGadgetsRecordingInterface` stub comment
-has been added in `convert_session.py` — pass `raw_rec_file_path` when available.
+when full Princeton access is restored.
 
-**Action taken:** Pipeline proceeds with `.mat`-only spike data. No code changes needed
-until `.rec` access is restored.
+**Action taken (2026-05-19):** Implemented `SpyglassSpikeGadgetsRecordingInterface`
+(`interfaces/spyglass_spikegadgets_recording_interface.py`), wired into
+`ArcEcephysNWBConverter` ahead of `SpikeSorting`, and exposed via the
+`spikegadgets_file_path` parameter on `session_to_nwb()`. When provided, it writes
+`ElectricalSeriesRaw` to acquisition so Spyglass can populate the `Raw` table on insertion.
+**Untested** — no `.rec` files are available yet, so this path has not been run end-to-end
+or verified against a real Spyglass insertion.
 
 ---
 

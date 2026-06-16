@@ -1,3 +1,6 @@
 from .bcontroldatainterface import BControlBehaviorInterface
 from .processed_trials_interface import ProcessedTrialsInterface
 from .spike_sorting_mat_interface import SpikeSortingMatInterface
+from .spyglass_spikegadgets_recording_interface import (
+    SpyglassSpikeGadgetsRecordingInterface,
+)

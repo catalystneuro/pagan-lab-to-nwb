@@ -36,6 +36,7 @@ def session_to_nwb(
     dati_file_path: FilePath | None = None,
     video_file_path: FilePath | None = None,
     video_time_offset: float | None = None,
+    spikegadgets_file_path: FilePath | None = None,
     task_params_file_path: FilePath | None = None,
     stub_test: bool = False,
     overwrite: bool = True,
@@ -55,6 +56,15 @@ def session_to_nwb(
         Path to the ``dati_*.mat`` processed trial/neural data file (optional).
     video_file_path :
         Path to the ``video_@*.mp4`` file (optional).
+    video_time_offset :
+        Constant offset (seconds) added to video timestamps (optional).
+    spikegadgets_file_path :
+        Path to the raw SpikeGadgets ``*.rec`` file (optional).
+        When provided, ``ElectricalSeriesRaw`` is written to acquisition and
+        Spyglass will populate the ``Raw`` table automatically on insertion.
+        If both ``spikegadgets_file_path`` and ``spikes_file_path`` are given,
+        SpikeGadgets runs first and builds the electrode table; SpikeSorting
+        then maps units into the existing rows.
     task_params_file_path :
         YAML file with task argument descriptions (optional).
     stub_test :
@@ -98,6 +108,10 @@ def session_to_nwb(
             raise FileNotFoundError(f"YAML not found: '{task_params_file_path}'")
         arguments_metadata = load_dict_from_file(task_params_file_path)
         conversion_options["Behavior"]["arguments_metadata"] = arguments_metadata
+
+    if spikegadgets_file_path is not None:
+        source_data["SpikeGadgets"] = dict(file_path=Path(spikegadgets_file_path))
+        conversion_options["SpikeGadgets"] = dict(stub_test=stub_test)
 
     if spikes_file_path is not None:
         source_data["SpikeSorting"] = dict(file_path=Path(spikes_file_path))
