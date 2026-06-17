@@ -5,7 +5,7 @@ NWB conversion scripts for Pagan lab data to the
 This repository hosts two independent conversion pipelines:
 
 - **[ARC Behavior](#arc-behavior)** — BControl task-switching behavioral data underlying
-  [Mah et al. 2024, *Nature*](https://www.nature.com/articles/s41586-024-08433-6),
+  [Pagan et al. 2024, *Nature*](https://www.nature.com/articles/s41586-024-08433-6),
   published as [DANDI:001550](https://dandiarchive.org/dandiset/001550).
 - **[ARC Ecephys](#arc-ecephys)** — ongoing data collection combining tetrode
   electrophysiology, video, and BControl behavior, converted for ingestion into a
@@ -43,7 +43,7 @@ pipelines).
 ## ARC Behavior
 
 BControl behavioral data from the task-switching auditory decision-making paradigm
-described in [Mah et al. 2024, *Nature*](https://www.nature.com/articles/s41586-024-08433-6).
+described in [Pagan et al. 2024, *Nature*](https://www.nature.com/articles/s41586-024-08433-6).
 Each session is converted to NWB using
 [`ndx-structured-behavior`](https://github.com/rly/ndx-structured-behavior) to represent
 the finite-state-machine states, events, actions, and per-trial stimulus data for all
