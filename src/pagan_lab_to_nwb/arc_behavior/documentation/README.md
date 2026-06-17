@@ -19,8 +19,3 @@ understanding why certain files were excluded and what workarounds are in the co
 ### `conversion_progress.md`
 Running tally of converted and uploaded files by protocol, including the DANDI upload
 status. Also contains the NWBInspector summary and per-protocol exclusion breakdowns.
-
-### `nwbinspector_report.md`
-Detailed NWBInspector 0.7.1 report for all converted files (`--config dandi`). Explains
-which violations are actionable, which are by design, and which are inspector bugs.
-References `conversion_issues.md` for the known empty-table crash.
