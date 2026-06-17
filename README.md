@@ -89,7 +89,6 @@ Detailed notes for the `arc_behavior` conversion live in
 | `data_manifest.md` | Field-by-field map from BControl `.mat` to NWB |
 | `conversion_issues.md` | Bugs, data quirks, and fixes encountered during conversion |
 | `conversion_progress.md` | Per-protocol file counts and DANDI upload status |
-| `nwbinspector_report.md` | NWBInspector results and explanation of each violation |
 
 ### Spyglass insertion
 

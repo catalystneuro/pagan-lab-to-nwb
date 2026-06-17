@@ -41,9 +41,19 @@ _CONF_PATH = Path(__file__).parent.parent / "arc_ecephys" / "dj_local_conf.json"
 dj.config.load(str(_CONF_PATH))  # ← MUST be before spyglass imports
 dj.conn(use_tls=False)
 
+import numpy as np
 import spyglass.common as sgc
 import spyglass.data_import as sgi
 from spyglass.common import Nwbfile
+from spyglass.common.common_interval import IntervalList
+from spyglass.common.common_optogenetics import (
+    OpticalFiberDevice,
+    OpticalFiberImplant,
+    OptogeneticProtocol,
+    Virus,
+    VirusInjection,
+)
+from spyglass.common.common_task import Task, TaskEpoch
 from spyglass.common.common_task_rec import TaskRecording, TaskRecordingTypes
 from spyglass.settings import raw_dir
 from spyglass.utils.nwb_helper_fn import get_nwb_copy_filename, get_nwb_file
@@ -195,6 +205,203 @@ def test_task_recording_types(nwbfile_path: Path):
     print(f"test_task_recording_types passed for {nwbfile_path.name}")
 
 
+def test_optogenetics(nwbfile_path: Path):
+    """Assert optogenetics tables were populated correctly for opto sessions.
+
+    No-op for sessions without ``opto_epochs`` (non-opto sessions).
+
+    Checks:
+    - Hardware tables populated by ``insert_sessions()``: ``Virus`` (1 row),
+      ``VirusInjection`` (2 rows — bilateral), ``OpticalFiberDevice`` (1 row),
+      ``OpticalFiberImplant`` (2 rows — bilateral).
+    - Post-hoc tables inserted by ``insert_optogenetics()``: ``IntervalList``,
+      ``TaskEpoch`` (epoch=1), ``OptogeneticProtocol`` (epoch=1).
+    - ``OptogeneticProtocol`` values round-trip against the source NWB file:
+      ``pulse_length``, ``stimulus_power``, ``stimulus_object_id``.
+    """
+    nwb_copy_file_name = get_nwb_copy_filename(nwbfile_path.name)
+    nwb_dict = dict(nwb_file_name=nwb_copy_file_name)
+
+    nwbfile = get_nwb_file(str(nwbfile_path))
+    opto_epochs = nwbfile.intervals.get("opto_epochs")
+    if opto_epochs is None:
+        return  # not an opto session
+
+    df = opto_epochs.to_dataframe()
+
+    # ── Hardware tables (populated by insert_sessions() from NWB objects) ──
+    virus_rows = Virus() & {"virus_name": "aav_mdlx_chr2_mcherry"}
+    assert len(virus_rows) == 1, f"Expected 1 Virus row, got {len(virus_rows)}"
+
+    inj_rows = VirusInjection() & nwb_dict
+    assert len(inj_rows) == 2, f"Expected 2 VirusInjection rows (bilateral), got {len(inj_rows)}"
+
+    fiber_device_rows = OpticalFiberDevice() & {"fiber_name": "fof_fiber_model"}
+    assert len(fiber_device_rows) == 1, f"Expected 1 OpticalFiberDevice row, got {len(fiber_device_rows)}"
+
+    fiber_implant_rows = OpticalFiberImplant() & nwb_dict
+    assert (
+        len(fiber_implant_rows) == 2
+    ), f"Expected 2 OpticalFiberImplant rows (bilateral), got {len(fiber_implant_rows)}"
+
+    # ── Post-hoc tables (inserted by insert_optogenetics()) ──
+    protocol_name = nwbfile.session_id.split("-")[0]
+
+    interval_rows = IntervalList() & nwb_dict & {"interval_list_name": "01"}
+    assert len(interval_rows) == 1, f"Expected IntervalList '01', got {len(interval_rows)} rows"
+
+    epoch_rows = TaskEpoch() & nwb_dict & {"epoch": 1}
+    assert len(epoch_rows) == 1, f"Expected TaskEpoch epoch=1, got {len(epoch_rows)} rows"
+    assert epoch_rows.fetch1("task_name") == protocol_name, f"TaskEpoch.task_name mismatch: expected '{protocol_name}'"
+
+    protocol_rows = OptogeneticProtocol() & nwb_dict & {"epoch": 1}
+    assert len(protocol_rows) == 1, f"Expected OptogeneticProtocol epoch=1, got {len(protocol_rows)} rows"
+
+    db = protocol_rows.fetch1()
+    expected_pulse_length = float(df["pulse_length_in_ms"].max())
+    assert (
+        db["pulse_length"] == expected_pulse_length
+    ), f"OptogeneticProtocol.pulse_length: expected {expected_pulse_length}, got {db['pulse_length']}"
+    expected_power = float(df["power_in_mW"].max())
+    assert (
+        db["stimulus_power"] == expected_power
+    ), f"OptogeneticProtocol.stimulus_power: expected {expected_power}, got {db['stimulus_power']}"
+    assert db["stimulus_object_id"] == opto_epochs.object_id, f"OptogeneticProtocol.stimulus_object_id mismatch"
+
+    print(f"test_optogenetics passed for {nwbfile_path.name}")
+
+
+# ---------------------------------------------------------------------------
+# Optogenetics insertion (post-hoc, Spyglass-only tables)
+# ---------------------------------------------------------------------------
+
+# Stimulation window types and their durations (from _bcontrol_metadata.yaml).
+# Used in the session-level OptogeneticProtocol description.
+_OPTO_WINDOW_TYPES = {
+    "Full Trial": 1300.0,  # 0–1.3 s post-cpoke
+    "First Half": 650.0,  # 0–0.65 s post-cpoke
+    "Second Half": 650.0,  # 0.65–1.3 s post-cpoke
+}
+
+
+def insert_optogenetics(nwb_copy_file_name: str, nwbfile) -> None:
+    """Populate Spyglass optogenetics tables post-hoc for opto sessions.
+
+    Reads per-trial data from ``nwbfile.intervals["opto_epochs"]`` and inserts
+    ``Task``, ``IntervalList``, ``TaskEpoch``, and ``OptogeneticProtocol``
+    directly (bypassing ``make()``). These tables are Spyglass-specific and
+    are not embedded in the NWB file itself.
+
+    ``OptogeneticProtocol`` stores one row for the whole session (epoch 1).
+    The session-level ``pulse_length`` is the maximum across trial types
+    (1300 ms for Full Trial). Per-trial parameters are in
+    ``nwbfile.intervals["opto_epochs"]``.
+
+    Also verifies that ``Virus``, ``VirusInjection``, ``OpticalFiberDevice``,
+    and ``OpticalFiberImplant`` were populated by ``insert_sessions()``.
+    """
+    opto_epochs = nwbfile.intervals.get("opto_epochs")
+    if opto_epochs is None:
+        return  # not an opto session
+
+    nwb_dict = {"nwb_file_name": nwb_copy_file_name}
+    df = opto_epochs.to_dataframe()
+
+    # Full session time range from the trials table.
+    trials_df = nwbfile.trials.to_dataframe() if nwbfile.trials is not None else df
+    session_stop = float(trials_df["stop_time"].max())
+
+    # Session-level aggregate values: use max across all opto trials.
+    max_pulse_length = float(df["pulse_length_in_ms"].max())
+    max_period = float(df["period_in_ms"].max())
+    session_power = float(df["power_in_mW"].max())
+
+    # Protocol name from session_id (e.g. "TaskSwitch6-190815a" → "TaskSwitch6").
+    protocol_name = nwbfile.session_id.split("-")[0]
+
+    window_doc = ", ".join(f"{wtype}={ms:.0f}ms" for wtype, ms in _OPTO_WINDOW_TYPES.items())
+    # OptogeneticProtocol.description is varchar(255); keep well under that limit.
+    description = (
+        f"Bilateral FOF ChR2 via Cerebro. "
+        f"Per-trial window types ({window_doc}; re cpoke). "
+        f"Session pulse_length=max ({max_pulse_length:.0f} ms). "
+        f"Per-trial detail: nwb.intervals['opto_epochs']."
+    )[:255]
+
+    # 1. IntervalList — session-level interval anchoring TaskEpoch.
+    interval_list_name = "01"
+    IntervalList.insert1(
+        {
+            "nwb_file_name": nwb_copy_file_name,
+            "interval_list_name": interval_list_name,
+            "valid_times": np.array([[0.0, session_stop]]),
+        },
+        skip_duplicates=True,
+    )
+
+    # 2. Task — protocol-level metadata (shared across sessions).
+    Task.insert1(
+        {
+            "task_name": protocol_name,
+            "task_description": "Auditory decision-making task-switching paradigm (BControl)",
+            "task_type": "auditory decision-making",
+            "task_subtype": "task-switching",
+        },
+        skip_duplicates=True,
+    )
+
+    # 3. TaskEpoch — one epoch per session (arc_behavior has no multi-epoch structure).
+    if not (TaskEpoch() & nwb_dict & {"epoch": 1}):
+        TaskEpoch.insert1(
+            {
+                "nwb_file_name": nwb_copy_file_name,
+                "epoch": 1,
+                "task_name": protocol_name,
+                "interval_list_name": interval_list_name,
+                "task_environment": "behavioral_box",
+                "camera_names": [],
+            },
+            allow_direct_insert=True,
+        )
+
+    # 4. OptogeneticProtocol — one row per epoch (session).
+    if not (OptogeneticProtocol() & nwb_dict & {"epoch": 1}):
+        OptogeneticProtocol.insert1(
+            {
+                "nwb_file_name": nwb_copy_file_name,
+                "epoch": 1,
+                "description": description,
+                "pulse_length": max_pulse_length,
+                "pulses_per_train": 1,
+                "period": max_period,
+                "intertrain_interval": 0.0,
+                "stimulus_power": session_power,
+                # object_id of the opto_epochs TimeIntervals table in the NWB file,
+                # used as the stimulus reference (Spyglass stores this as a UUID string).
+                "stimulus_object_id": opto_epochs.object_id,
+            }
+        )
+
+    print("Optogenetics tables populated: IntervalList, Task, TaskEpoch, OptogeneticProtocol.")
+
+    # Verify that insert_sessions() populated the hardware tables from the NWB objects.
+    # If these are empty it means the Tier 1 field fixes in _optogenetics.py are missing.
+    warnings = []
+    if not (Virus() & {"virus_name": "aav_mdlx_chr2_mcherry"}):
+        warnings.append("Virus")
+    if not (VirusInjection() & nwb_dict):
+        warnings.append("VirusInjection")
+    if not (OpticalFiberDevice() & {"fiber_name": "fof_fiber_model"}):
+        warnings.append("OpticalFiberDevice")
+    if not (OpticalFiberImplant() & nwb_dict):
+        warnings.append("OpticalFiberImplant")
+    if warnings:
+        print(
+            f"  WARNING: {', '.join(warnings)} inserted 0 rows — "
+            "Tier 1 field fixes in _optogenetics.py + _bcontrol_metadata.yaml are still needed."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Main insertion
 # ---------------------------------------------------------------------------
@@ -211,7 +418,16 @@ def insert_session(
     Parameters
     ----------
     nwbfile_path :
-        Full path to the NWB file — must already be in SPYGLASS_RAW_DIR.
+        Full path to the NWB file.  The file MUST be at the **root** of
+        SPYGLASS_RAW_DIR (not in a subject subfolder).  Spyglass copies
+        the file to a ``_``-suffixed name in that same directory and creates
+        an HDF5 external link back to the source.  The link is stored as a
+        path relative to SPYGLASS_RAW_DIR, so if the source is in a subfolder
+        the link resolves to the wrong location and the copy reads stale data.
+        Copy with::
+
+            cp /path/to/sub-ID/sub-ID_ses-<session>.nwb  \\
+               /Volumes/T9/data/Pagan/raw/sub-ID_ses-<session>.nwb
     rollback_on_fail :
         Roll back the transaction on error (passed to insert_sessions).
     raise_err :
@@ -263,6 +479,11 @@ def insert_session(
         task_rec.insert_from_nwbfile(nwb_copy_file_name, nwbfile)
 
     print("BControl tables (TaskRecordingTypes, TaskRecording) populated.")
+
+    # Optogenetics tables (only for sessions with active laser stimulation).
+    insert_optogenetics(nwb_copy_file_name, nwbfile)
+    test_optogenetics(nwbfile_path)
+
     print_tables(nwbfile_path)
 
 
@@ -279,3 +500,4 @@ if __name__ == "__main__":
         nwbfile_path = SPYGLASS_RAW_DIR / nwb_file_name
         insert_session(nwbfile_path=nwbfile_path, clean_existing=True)
         test_task_recording_types(nwbfile_path=nwbfile_path)
+        test_optogenetics(nwbfile_path=nwbfile_path)

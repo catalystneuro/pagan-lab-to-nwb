@@ -111,6 +111,10 @@ def add_optogenetic_series_to_nwbfile(
         core_diameter_in_um=fm["core_diameter_in_um"],
         manufacturer=fm["manufacturer"],
         description=fm["description"],
+        model_number=fm["model_number"],
+        active_length_in_mm=fm["active_length_in_mm"],
+        ferrule_name=fm["ferrule_name"],
+        ferrule_diameter_in_mm=fm["ferrule_diameter_in_mm"],
     )
     nwbfile.add_device_model(fiber_model)
 
@@ -122,8 +126,13 @@ def add_optogenetic_series_to_nwbfile(
         model=fiber_model,
         fiber_insertion=FiberInsertion(
             name="fiber_insertion",
+            hemisphere=fl["hemisphere"],
             insertion_position_ap_in_mm=fl["insertion_position_ap_in_mm"],
             insertion_position_ml_in_mm=fl["insertion_position_ml_in_mm"],
+            insertion_position_dv_in_mm=fl["insertion_position_dv_in_mm"],
+            insertion_angle_yaw_in_deg=fl["insertion_angle_yaw_in_deg"],
+            insertion_angle_pitch_in_deg=fl["insertion_angle_pitch_in_deg"],
+            insertion_angle_roll_in_deg=fl["insertion_angle_roll_in_deg"],
         ),
     )
     fr = opto_meta["optical_fibers"]["right"]
@@ -133,8 +142,13 @@ def add_optogenetic_series_to_nwbfile(
         model=fiber_model,
         fiber_insertion=FiberInsertion(
             name="fiber_insertion",
+            hemisphere=fr["hemisphere"],
             insertion_position_ap_in_mm=fr["insertion_position_ap_in_mm"],
             insertion_position_ml_in_mm=fr["insertion_position_ml_in_mm"],
+            insertion_position_dv_in_mm=fr["insertion_position_dv_in_mm"],
+            insertion_angle_yaw_in_deg=fr["insertion_angle_yaw_in_deg"],
+            insertion_angle_pitch_in_deg=fr["insertion_angle_pitch_in_deg"],
+            insertion_angle_roll_in_deg=fr["insertion_angle_roll_in_deg"],
         ),
     )
     nwbfile.add_device(fiber_left)
@@ -160,7 +174,7 @@ def add_optogenetic_series_to_nwbfile(
         name=vv["name"],
         construct_name=vv["construct_name"],
         manufacturer=vv["manufacturer"],
-        titer_in_vg_per_ml=float("nan"),  # not reported in paper
+        titer_in_vg_per_ml=float(vv["titer_in_vg_per_ml"]),
         description=vv["description"],
     )
 
@@ -172,7 +186,10 @@ def add_optogenetic_series_to_nwbfile(
         reference=il["reference"],
         ap_in_mm=il["ap_in_mm"],
         ml_in_mm=il["ml_in_mm"],
-        dv_in_mm=float("nan"),  # not reported as single value; injected over 1.5 mm tract
+        dv_in_mm=il["dv_in_mm"],
+        pitch_in_deg=il["pitch_in_deg"],
+        roll_in_deg=il["roll_in_deg"],
+        yaw_in_deg=il["yaw_in_deg"],
         volume_in_uL=il["volume_in_uL"],
         viral_vector=virus,
         description=il["description"],
@@ -185,7 +202,10 @@ def add_optogenetic_series_to_nwbfile(
         reference=ir["reference"],
         ap_in_mm=ir["ap_in_mm"],
         ml_in_mm=ir["ml_in_mm"],
-        dv_in_mm=float("nan"),  # not reported as single value; injected over 1.5 mm tract
+        dv_in_mm=ir["dv_in_mm"],
+        pitch_in_deg=ir["pitch_in_deg"],
+        roll_in_deg=ir["roll_in_deg"],
+        yaw_in_deg=ir["yaw_in_deg"],
         volume_in_uL=ir["volume_in_uL"],
         viral_vector=virus,
         description=ir["description"],

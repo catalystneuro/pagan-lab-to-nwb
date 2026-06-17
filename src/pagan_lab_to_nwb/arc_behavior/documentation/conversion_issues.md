@@ -48,7 +48,7 @@ session was aborted before starting. These files contain no trial data and
 cannot have a meaningful `session_start_time`.
 **Fix:** By design — these files are intentionally excluded. The check is in
 `bcontroldatainterface.py::get_metadata()`.
-**Status:** Known exclusion; documented in nwbinspector_report.md.
+**Status:** Known exclusion.
 
 ---
 
@@ -94,8 +94,7 @@ history variables, 3 TaskSwitch4double-specific columns) have been added to
 `arc_behavior/task_switch6_params.yaml` under version control. The 67
 remaining column names with missing descriptions are low-priority parameters
 (display toggles, internal counters).
-**Status:** Partially resolved. Remaining columns documented in
-`nwbinspector_report.md §3`.
+**Status:** Partially resolved. Remaining 67 column names with missing descriptions are low-priority parameters (display toggles, internal counters).
 
 ---
 
@@ -182,7 +181,7 @@ remains a single wavelength duplicated to satisfy the shape-(2,) requirement.
 
 **Affected files:** All sessions with active optogenetics (e.g.
 `sub-P131_ses-TaskSwitch6-190815a.nwb`), when inserted into Spyglass.
-**Symptom:**
+**Symptom (original):**
 ```
 [ERROR] Spyglass: Errors occurred during population for sub-P131_ses-TaskSwitch6-190815a_.nwb:
 	Failed tables ['OptogeneticProtocol']
@@ -200,38 +199,48 @@ structure both in column names and in row cardinality. At the time this error
 was hit, `_bcontrol_metadata.yaml`'s `epochs_table.name` had reverted to
 `optogenetic_epochs` during the April 2026 metadata centralization
 (`0af6155`), silently undoing an earlier rename to `opto_epochs` (May 2026,
-`6d8063e`) that had been applied to a since-removed metadata file —
-`tutorials/arc_behavior_optogenetics_notebook.ipynb` already referenced
-`opto_epochs`, so it was out of sync with the NWB files it was written
-against.
-**Fix:** Renamed `_bcontrol_metadata.yaml`'s `Optogenetics.epochs_table.name`
-back to `opto_epochs`. With this name, `OptogeneticProtocol.make()`'s
-`nwb.intervals.get("optogenetic_epochs", None)` returns `None`, so it logs a
-warning and returns — no `InsertError`, and `Session`/`TaskEpoch`/
-`TaskRecordingTypes`/`TaskRecording` insert normally with the standard
-`rollback_on_fail=True, raise_err=True`. This also makes
-`arc_behavior_optogenetics_notebook.ipynb`'s existing `opto_epochs` references
-correct again.
-**Status:** Fixed. `OptogeneticProtocol` is intentionally not populated for
-opto sessions — the rich per-trial stimulation data remains fully present and
-queryable directly from the NWB file's `opto_epochs` table.
-`VirusInjection`/`OpticalFiberImplant` also insert 0 rows for opto sessions
-(`missing required attribute pitch`/`hemisphere` — `FiberInsertion`/
-`ViralVectorInjection` in `_optogenetics.py` don't set these fields); this is
-a separate, non-fatal gap, not yet investigated.
+`6d8063e`) that had been applied to a since-removed metadata file.
 
-**Towards full Spyglass `OptogeneticProtocol` compatibility (not implemented):**
-Populating `OptogeneticProtocol` would require an *additional*,
-session/epoch-level table literally named `optogenetic_epochs` with exactly
-one row per `TaskEpoch` (these sessions have one epoch), containing
-`epoch_number`, `convenience_code`, `pulse_length_in_ms`,
-`number_pulses_per_pulse_train`, `period_in_ms`, `intertrain_interval_in_ms`,
-`power_in_mW`, and a `stimulus_signal` reference (an NWB `TimeSeries`/`DIO`
-object whose `object_id` becomes `OptogeneticProtocol.stimulus_object_id`) —
-alongside (not instead of) the existing per-trial `opto_epochs` table. This
-needs lab input on what session-level "protocol" values to report when
-per-trial parameters vary (window type, L/R power), plus a new `TimeSeries`
-for `stimulus_signal`. Worth scoping as a follow-up if Spyglass-side
-optogenetics queries become a priority.
+**Fix (June 2026 — fully resolved):**
+
+*Tier 1 — hardware tables* (`_optogenetics.py` + `_bcontrol_metadata.yaml`):
+Added previously missing Spyglass-required fields (`hemisphere`,
+`insertion_position_dv_in_mm`, `insertion_angle_*`, `model_number`,
+`active_length_in_mm`, `ferrule_name`, `ferrule_diameter_in_mm`,
+`titer_in_vg_per_ml`, `dv_in_mm`, `pitch_in_deg`, `roll_in_deg`,
+`yaw_in_deg`) to `FiberInsertion`, `OpticalFiberModel`, and
+`ViralVectorInjection` constructors.  Fields not reported in the source paper
+carry documented placeholder values (0.0 for angles, typical spec values for
+model/titer).  `VirusInjection` and `OpticalFiberImplant` now insert 2 rows
+each (bilateral FOF) for all opto sessions.
+
+*Tier 2 — protocol tables* (`arc_behavior/insert_session.py`):
+`OptogeneticProtocol.make()` is bypassed entirely.  After `insert_sessions()`
+completes, `insert_session.py` post-hoc inserts `IntervalList` (one interval
+= full session), `Task` (shared across sessions for the protocol), `TaskEpoch`
+(epoch 1 = whole session), and `OptogeneticProtocol` (one row per session).
+Session-level aggregate values: `pulse_length` = max across window types
+(1300 ms for Full Trial); description documents all three window types.
+`stimulus_object_id` = `opto_epochs.object_id` (UUID of the per-trial
+`OptogeneticEpochsTable` in the NWB file).
+
+Rationale for keeping our `opto_epochs` table name (not renaming to
+`optogenetic_epochs`): the Spyglass `make()` path requires
+`ndx-franklab-novela`'s `FrankLabOptogeneticEpochsTable` with extra columns
+(`epoch_number`, `convenience_code`, `stimulus_signal`) incompatible with our
+per-trial, DANDI-published structure.  Post-hoc insertion keeps the NWB file
+clean and DANDI-compliant while providing full Spyglass queryability.
+
+**Status:** Fully resolved. `Virus`, `VirusInjection`, `OpticalFiberDevice`,
+`OpticalFiberImplant`, `IntervalList`, `Task`, `TaskEpoch`, and
+`OptogeneticProtocol` all populate correctly for opto sessions.  Verified on
+`sub-P131_ses-TaskSwitch6-190815a` (June 2026). See
+`tutorials/spyglass_optogenetics_tutorial.ipynb` for the query workflow.
+
+**SPYGLASS_RAW_DIR placement:** The source NWB file must be at the **root** of
+`SPYGLASS_RAW_DIR` (not in a per-subject subfolder). Spyglass creates an HDF5
+external link from the `_` copy back to the source using a path relative to
+that root; placing the source in a subfolder causes the link to resolve to a
+stale file.
 
 ---
