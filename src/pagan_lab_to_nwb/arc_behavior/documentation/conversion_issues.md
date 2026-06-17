@@ -167,7 +167,7 @@ to length 2 if `dict_deep_update` collapsed it to length 1.
 (a generic "blue DPSS laser" assumption) was replaced with 450.0 nm across
 `_bcontrol_metadata.yaml` (`excitation_source_model.wavelength_range_in_nm`,
 `laser_device.description`, `stimulation.wavelength_in_nm`,
-`stimulus_sites.*.excitation_lambda`) and `data_manifest.md`. Source: Mah et al.
+`stimulus_sites.*.excitation_lambda`) and `data_manifest.md`. Source: Pagan et al.
 2024 (Nature, doi:10.1038/s41586-024-08433-6), Extended Data Fig. 4f,g caption,
 which states the FOF inactivation experiments used "blue light (450 nm, 25 mW)"
 via AAV2/5-mDlx-ChR2-mCherry and the Cerebro wireless system — matching the
