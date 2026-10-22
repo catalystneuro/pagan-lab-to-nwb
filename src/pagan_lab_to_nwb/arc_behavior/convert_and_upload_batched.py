@@ -1,10 +1,10 @@
 """Batch conversion + DANDI upload for any BControl protocol.
 
 For each batch of .mat files:
-  1. Convert .mat → NWB  (skips files whose NWB already exists on disk)
+  1. Convert .mat → NWB  (skips files whose NWB already exists on disk, unless ``--overwrite``)
   2. Run ``dandi validate`` on every new NWB file (PyNWB schema + nwbinspector).
      Files that fail genuine validation are logged and NOT uploaded.
-  3. Upload validated files.  ``--validation ignore`` is passed to ``dandi upload``
+  3. Upload validated files (skipped with ``--no-upload``).  ``--validation ignore`` is passed to ``dandi upload``
      only for files that already passed step 2; this avoids a known nwbinspector 0.7.1
      bug (IndexError on empty HDF5 datasets) that crashes the upload's internal
      re-validation but does not indicate a real file error.
@@ -16,6 +16,9 @@ Usage
 
 # Convert + upload all TaskSwitch6 sessions:
 .venv/bin/python src/pagan_lab_to_nwb/arc_behavior/convert_and_upload_batched.py --protocol TaskSwitch6
+
+# Convert only, 6 files at a time:
+.venv/bin/python src/pagan_lab_to_nwb/arc_behavior/convert_and_upload_batched.py --protocol TaskSwitch6 --no-upload --workers 6
 
 # Resume from batch 5:
 .venv/bin/python src/pagan_lab_to_nwb/arc_behavior/convert_and_upload_batched.py --protocol TaskSwitch6 --start-batch 5
@@ -41,6 +44,7 @@ import re
 import subprocess
 import sys
 import traceback
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 from tqdm import tqdm
@@ -79,7 +83,7 @@ def _get_mat_files(data_dir: Path, protocol: str) -> list[Path]:
 
 
 def _nwb_path_for(mat_file: Path, output_dir: Path) -> Path | None:
-    """Return the expected NWB output path for a .mat file, or None if unparseable."""
+    """Return the expected NWB output path for a .mat file, or None if unparsable."""
     stem = mat_file.stem.replace("data_@", "")
     m = _STEM_PATTERN.match(stem)
     if not m:
@@ -91,28 +95,44 @@ def _nwb_path_for(mat_file: Path, output_dir: Path) -> Path | None:
     return output_dir / f"sub-{subject_id}" / nwb_name
 
 
-def convert_batch(batch_files: list[Path], output_dir: Path, error_log: Path) -> list[Path]:
-    """Convert a batch of .mat files. Returns list of successfully created NWB paths."""
+def _convert_one(mat_file: Path, output_dir: Path, overwrite: bool) -> tuple[Path | None, str | None]:
+    """Convert one .mat file. Returns (NWB path, None) on success or (None, traceback) on failure."""
+    try:
+        nwb_path = session_to_nwb(
+            file_path=mat_file,
+            nwb_folder_path=output_dir,
+            task_params_file_path=_TASK_PARAMS_YAML_PATH,
+            stub_test=False,
+            overwrite=overwrite,
+        )
+        return nwb_path, None
+    except Exception:
+        return None, traceback.format_exc()
+
+
+def convert_batch(
+    batch_files: list[Path], output_dir: Path, error_log: Path, overwrite: bool = False, workers: int = 1
+) -> list[Path]:
+    """Convert a batch of .mat files in ``workers`` processes. Returns list of successfully created NWB paths."""
     nwb_paths = []
-    for mat_file in tqdm(batch_files, desc="  Converting", leave=False):
-        try:
-            nwb_path = session_to_nwb(
-                file_path=mat_file,
-                nwb_folder_path=output_dir,
-                task_params_file_path=_TASK_PARAMS_YAML_PATH,
-                stub_test=False,
-                overwrite=False,
-            )
-            nwb_paths.append(nwb_path)
-        except Exception:
-            with error_log.open("a") as f:
-                f.write(f"\n--- Conversion error: {mat_file.name} ---\n")
-                f.write(traceback.format_exc())
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        results = executor.map(
+            _convert_one, batch_files, [output_dir] * len(batch_files), [overwrite] * len(batch_files)
+        )
+        for mat_file, (nwb_path, error) in tqdm(
+            zip(batch_files, results), total=len(batch_files), desc="  Converting", leave=False
+        ):
+            if error is None:
+                nwb_paths.append(nwb_path)
+            else:
+                with error_log.open("a") as f:
+                    f.write(f"\n--- Conversion error: {mat_file.name} ---\n")
+                    f.write(error)
     return nwb_paths
 
 
-def validate_batch(nwb_paths: list[Path], validate_error_log: Path) -> tuple[list[Path], list[Path]]:
-    """Run ``dandi validate`` on each NWB file.
+def validate_batch(nwb_paths: list[Path], validate_error_log: Path, workers: int = 1) -> tuple[list[Path], list[Path]]:
+    """Run ``dandi validate`` on each NWB file, ``workers`` at a time.
 
     Returns
     -------
@@ -125,12 +145,13 @@ def validate_batch(nwb_paths: list[Path], validate_error_log: Path) -> tuple[lis
     valid_paths = []
     invalid_paths = []
 
-    for nwb_path in tqdm(nwb_paths, desc="  Validating", leave=False):
-        result = subprocess.run(
-            [str(_VENV_DANDI), "validate", str(nwb_path)],
-            capture_output=True,
-            text=True,
-        )
+    def _validate(nwb_path: Path) -> subprocess.CompletedProcess:
+        return subprocess.run([str(_VENV_DANDI), "validate", str(nwb_path)], capture_output=True, text=True)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(tqdm(executor.map(_validate, nwb_paths), total=len(nwb_paths), desc="  Validating", leave=False))
+
+    for nwb_path, result in zip(nwb_paths, results):
         if result.returncode == 0:
             valid_paths.append(nwb_path)
             continue
@@ -197,6 +218,13 @@ def main():
     parser.add_argument("--batch-size", type=int, default=150, help="Files per batch (default: 150)")
     parser.add_argument("--start-batch", type=int, default=0, help="Batch index to start from (default: 0)")
     parser.add_argument("--dry-run", action="store_true", help="Print batch plan without converting")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Re-convert files whose NWB already exists on disk (needed after any code or metadata change)",
+    )
+    parser.add_argument("--no-upload", action="store_true", help="Convert and validate only; do not upload")
+    parser.add_argument("--workers", type=int, default=1, help="Files converted and validated in parallel (default: 1)")
     args = parser.parse_args()
 
     protocol = args.protocol
@@ -234,8 +262,12 @@ def main():
         batch_files = all_files[batch_idx * args.batch_size : (batch_idx + 1) * args.batch_size]
         subjects = sorted({f.parent.name for f in batch_files})
 
-        # Skip files whose NWB already exists on disk
-        to_convert = [f for f in batch_files if not (_nwb_path_for(f, output_dir) or Path("/nonexistent")).exists()]
+        # Skip files whose NWB already exists on disk, unless --overwrite is set
+        to_convert = [
+            f
+            for f in batch_files
+            if args.overwrite or not (_nwb_path_for(f, output_dir) or Path("/nonexistent")).exists()
+        ]
         already_done = len(batch_files) - len(to_convert)
 
         print(
@@ -250,7 +282,9 @@ def main():
             continue
 
         # Step 1: Convert
-        nwb_paths = convert_batch(to_convert, output_dir, convert_error_log)
+        nwb_paths = convert_batch(
+            to_convert, output_dir, convert_error_log, overwrite=args.overwrite, workers=args.workers
+        )
         conv_errors = len(to_convert) - len(nwb_paths)
         total_converted += len(nwb_paths)
         total_conv_errors += conv_errors
@@ -261,7 +295,7 @@ def main():
 
         # Step 2: Validate
         print(f"  Validating {len(nwb_paths)} files with dandi validate...")
-        valid_paths, invalid_paths = validate_batch(nwb_paths, validate_error_log)
+        valid_paths, invalid_paths = validate_batch(nwb_paths, validate_error_log, workers=args.workers)
         total_invalid += len(invalid_paths)
         print(
             f"  Validated : {len(valid_paths)} OK  |  {len(invalid_paths)} genuine errors"
@@ -269,7 +303,7 @@ def main():
         )
 
         # Step 3: Upload validated files
-        if valid_paths:
+        if valid_paths and not args.no_upload:
             print(f"  Uploading {len(valid_paths)} validated files to DANDI...")
             ok = upload_files(valid_paths, output_dir)
             if not ok:
