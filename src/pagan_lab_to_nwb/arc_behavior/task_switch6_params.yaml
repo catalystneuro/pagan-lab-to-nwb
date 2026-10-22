@@ -94,7 +94,9 @@ HistorySection:
     description: "Binary trial outcome per trial, ignoring violations. Values: 1 =\
       \ correct (result=1); 0 = error or error-forgiveness trial (result=2, 5, or\
       \ 6); NaN = violation trial (NIC or timeout, result=3 or 4). Used to compute\
-      \ performance metrics such as total_correct, left_correct, dir_correct."
+      \ performance metrics such as total_correct, left_correct, dir_correct. Omitted\
+      \ in sessions where every trial is a violation; result_history gives the outcome\
+      \ there."
   side_history:
     description: "Stimulus-determined correct response side for each trial. Values:\
       \ 'l' = correct side was left; 'r' = correct side was right. This reflects\
