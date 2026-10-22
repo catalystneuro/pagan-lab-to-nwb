@@ -1,6 +1,7 @@
 """Functions for building TrialsTable and TaskArgumentsTable."""
 
 import json
+import re
 from warnings import warn
 
 import numpy as np
@@ -45,14 +46,12 @@ def add_trials_to_nwbfile(
     trial_start_times = [events["states"][starting_state][0][1] for events in parsed_events]
     trial_stop_times = [events["states"][starting_state][1][0] for events in parsed_events]
 
+    states = states_table[:]
+    events = events_table[:]
+    actions = actions_table[:]
     for start, stop in zip(trial_start_times, trial_stop_times):
-        states = states_table[:]
         states_idx = states[(states["start_time"] >= start) & (states["stop_time"] <= stop)].index
-
-        events = events_table[:]
         events_idx = events[(events["timestamp"] >= start) & (events["timestamp"] <= stop)].index
-
-        actions = actions_table[:]
         actions_idx = actions[(actions["timestamp"] >= start) & (actions["timestamp"] <= stop)].index
 
         trials_table.add_trial(
@@ -137,6 +136,13 @@ def add_task_arguments(
     for argument_name in task_arguments_to_add:
         argument_description = get_description_from_arguments_metadata(arguments_metadata, argument_name)
         argument_value = saved[argument_name]
+
+        # Per-trial history arrays of a one-trial session are read as scalars.
+        if re.fullmatch(r"HistorySection_\w+_history", argument_name) and isinstance(argument_value, (int, float)):
+            argument_value = np.atleast_1d(argument_value)
+        # Signed stimulus strengths are stored as uint8 or int16 in some sessions.
+        if argument_name in ("HistorySection_gammadir_history", "HistorySection_gammafreq_history"):
+            argument_value = np.asarray(argument_value, dtype=float)
 
         if isinstance(argument_value, (np.ndarray, list)):
             if len(argument_value):
