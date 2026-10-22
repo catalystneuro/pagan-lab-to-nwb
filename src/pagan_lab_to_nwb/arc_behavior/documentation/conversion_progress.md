@@ -1,6 +1,6 @@
 # Conversion & Upload Progress — Pagan Lab → DANDI:001550
 
-**Last updated:** 2026-06-16
+**Last updated:** 2026-10-22
 
 ---
 
@@ -15,6 +15,10 @@
 
 **Upload is complete.** All 16,115 converted NWB files are on DANDI.
 
+**Re-conversion pending (issue #27):** the published files predate the 450 nm wavelength fix and the
+issue #27 fixes. The per-protocol table below gives the counts after re-conversion: P189
+TaskSwitch6-210516a and P013 TaskSwitch3-151113a are added, for 16,117 files and 89 exclusions.
+
 **Note:** The nwbinspector crash (IndexError on empty HDF5 datasets — issue #5 in `conversion_issues.md`) affects 8 specific files that are on DANDI, uploaded with `--validation ignore`. These are valid files; the crash is a known nwbinspector 0.7.1 bug.
 
 ---
@@ -23,18 +27,18 @@
 
 | Protocol | Source .mat | Converted NWB | Excluded | Exclusion reason |
 |---|---|---|---|---|
-| TaskSwitch6 | 1,565 | 1,550 | 15 | See §Exclusions below |
+| TaskSwitch6 | 1,565 | 1,551 | 14 | See §Exclusions below |
 | TaskSwitch4 | 13,841 | 13,777 | 64 | 61 "Ended at" aborts, 3 zero-trial |
 | TaskSwitch2 | 201 | 201 | 0 | All converted after null-byte + mixed-type fixes |
-| TaskSwitch3 | 112 | 111 | 1 | "Ended at" abort |
-| TaskSwitch4double | 102 | 96 | 6 | "Ended at" aborts |
+| TaskSwitch3 | 112 | 112 | 0 | P013/151113a previously failed with an older version of the code |
+| TaskSwitch4double | 102 | 96 | 6 | 5 "Ended at" aborts, 1 zero-trial |
 | TaskSwitch4new | 87 | 86 | 1 | "Ended at" abort |
 | TaskSwitch4repeat | 14 | 13 | 1 | "Ended at" abort |
 | ProAnti3Marino | 174 | 173 | 1 | "Ended at" abort |
 | PBups | 75 | 73 | 2 | "Ended at" aborts |
 | ProAnti3 | 16 | 16 | 0 | Complete |
 | TaskSwitch | 19 | 19 | 0 | Complete |
-| **Total** | **~16,206** | **16,115** | **~91** | |
+| **Total** | **16,206** | **16,117** | **89** | |
 
 ---
 
@@ -52,19 +56,24 @@ re-converted after the fix was applied and their NWB files exist on disk.
 
 ---
 
-## TaskSwitch6 — Exclusion Breakdown (15 files)
+## TaskSwitch6 — Exclusion Breakdown (14 files)
 
-All 15 excluded TaskSwitch6 sessions are confirmed:
+The 14 excluded TaskSwitch6 sessions are "Ended at" aborts with 0 trials:
 
 | Subject | File | Reason |
 |---|---|---|
-| P189 | 210529b, 210529a, 210523b, 210518b, 210516b, 210516a, 210328a | "Ended at" abort |
+| P189 | 210529b, 210529a, 210523b, 210518b, 210516b, 210328a | "Ended at" abort |
 | P187 | 190831b, 190801b, 190627b | "Ended at" abort |
 | P131 | 190807a, 191023a | "Ended at" abort |
 | P127 | 190610a | "Ended at" abort |
 | P116 | 190719a, 190607a | "Ended at" abort |
 
-**All 15 are "Ended at" aborts** (no trial data). The two data-anomaly sessions previously
+P189/210516a was previously listed here as an "Ended at" abort, which is wrong: its title has
+"Started at 00:15" and it has 33 trials. Trials 26 and 27 (0-based, both timeout violations)
+have corrupted state machine timestamps (up to 6.8e12 s), which raised a `ValueError` in
+`create_states`. `BControlBehaviorInterface` now drops such trials and records them in the
+file's `notes`, so the session is converted with 31 trials (27 valid, as in the paper's
+session table). See issue #27. The two data-anomaly sessions previously
 listed as excluded (P124/190726a — AssertionError; P131/190617a — TypeError) were
 subsequently fixed by the same code fixes applied to TaskSwitch4 anomalies and are now
 on DANDI. See `conversion_issues.md §10` for the original anomaly details.
