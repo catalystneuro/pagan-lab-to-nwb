@@ -265,20 +265,23 @@ The routing depends on array length relative to trial count:
 | `len == n_completed_trials + 2` | `trials.{argument_name}` column | Warns, trims 2 extra |
 | `len == n_completed_trials - 1` | `trials.{argument_name}` column | NaN appended |
 | `dtype == object` (inhomogeneous/nested) | `task.task_arguments` | JSON-dumped, expression_type="json" |
-| All-NaN array | Skipped | |
+| All-NaN array | Skipped | E.g. `HistorySection_hit_history` is absent when every trial is a violation; `HistorySection_result_history` still gives the outcome |
+| `HistorySection_*_history` read as a scalar | `trials.{argument_name}` column | One-trial sessions: pymatreader returns a scalar, which is wrapped as a length-1 array |
+| `HistorySection_gammadir_history`, `HistorySection_gammafreq_history` | `trials.{argument_name}` column | Cast to float64; some sessions store these signed strengths as uint8 or int16 |
 
 ### Per-trial data (`saved_history`)
 
 | BControl field | NWB location | Notes |
 |---|---|---|
 | `ProtocolsSection_parsed_events[i]["states"]` | `task_recording.states` (StatesTable) | All states sorted by start_time |
+| Trial with corrupted `state_0` (more than one interval or a time above one day) | Dropped from every per-trial field | Listed in `NWBFile.notes`; only P189 TaskSwitch6-210516a, trials 26 and 27 |
 | `ProtocolsSection_parsed_events[i]["pokes"]` | `task_recording.events` (EventsTable) | Port pokes, sorted by timestamp |
 | `ProtocolsSection_parsed_events[i]["waves"]` | `task_recording.actions` (ActionsTable) | Sounds/outputs, sorted by timestamp |
 | `StimulusSection_ThisStimulus[i]` scalar params | `trials.*` columns | See stimulus scalar columns above |
 | `StimulusSection_ThisStimulus[i].left_hi` | `trials.left_hi` (ragged) | Relative times in seconds from cpoke onset; add `cpoke_start_time` for absolute |
 | `StimulusSection_ThisStimulus[i].right_hi` | `trials.right_hi` (ragged) | Same |
 | `StimulusSection_ThisStimulus[i].left_lo` | `trials.left_lo` (ragged) | Same |
-| `StimulusSection_ThisStimulus[i].right_lo` | `trials.right_lo` (ragged) | Same |
+| `StimulusSection_ThisStimulus[i].right_lo` | `trials.right_lo` (ragged) | Same. A pulse column is absent when no trial in the session has a pulse of that type (only in sessions of 1 to 3 trials) |
 | `parsed_events[i].states.cpoke[0]` | `trials.cpoke_start_time` | Absolute cpoke onset (seconds); NaN for trials with no cpoke |
 | `StimulusSection_ThisStimulus[i].freqs` | `trials.freq_lo`, `trials.freq_hi` | Split: freqs[0] → freq_lo, freqs[1] → freq_hi |
 
