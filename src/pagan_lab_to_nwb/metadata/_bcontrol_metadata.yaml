@@ -21,7 +21,11 @@ Behavior:
   TaskArgumentsTable:
     description: Contains the task arguments for the task.
   TrialsTable:
-    description: Contains the start and stop times of each trial in the task.
+    description: >-
+      Contains the start and stop times of each trial in the task. A column is omitted from a
+      session when it would hold no values: HistorySection_hit_history when every trial is a
+      violation (HistorySection_result_history gives the outcome of every trial), and a pulse
+      column (left_hi, right_hi, left_lo, right_lo) when no trial has pulses of that type.
     # Ragged pulse-time columns: times relative to cpoke onset, one list per trial.
     # Add cpoke_start_time to convert to absolute session time.
     pulse_columns:
@@ -34,15 +38,22 @@ Behavior:
         Times of left-speaker, high-frequency pulses in seconds relative to cpoke onset
         (centre-port entry). Add cpoke_start_time to convert to absolute session time.
         Empty when no pulses of this type were generated.
+        The column is omitted from a session in which no trial has pulses of this type.
       right_hi: >-
         Times of right-speaker, high-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
+        Empty when no pulses of this type were generated.
+        The column is omitted from a session in which no trial has pulses of this type.
       left_lo: >-
         Times of left-speaker, low-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
+        Empty when no pulses of this type were generated.
+        The column is omitted from a session in which no trial has pulses of this type.
       right_lo: >-
         Times of right-speaker, low-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
+        Empty when no pulses of this type were generated.
+        The column is omitted from a session in which no trial has pulses of this type.
     columns:
       - name: crosstalk_dir
         description: The ratio to which the pulse is played from the left or right speaker. A value of 1 means the pulse is played only from the right side, and a value of 0 means the pulse is played equally from both speakers.
