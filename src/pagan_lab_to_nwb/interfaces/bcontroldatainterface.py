@@ -70,6 +70,45 @@ class BControlBehaviorInterface(BaseDataInterface):
             )
         self.saved = mat_data["saved"]
         self.saved_history = mat_data["saved_history"]
+        self.dropped_trial_indices = self._drop_corrupted_trials()
+
+    def _drop_corrupted_trials(self) -> list[int]:
+        """Remove trials whose starting-state timestamps are corrupted from ``saved`` and ``saved_history``.
+
+        A trial is corrupted when its starting state has more than one interval or a time above one day
+        (e.g. P189 TaskSwitch6-210516a, trials 26 and 27, with times up to 6.8e12 s). Returns the 0-based
+        indices of the removed trials.
+        """
+        parsed_events = self.saved_history.get("ProtocolsSection_parsed_events")
+        if not isinstance(parsed_events, list):
+            return []
+        corrupted = []
+        for trial_index, trial_events in enumerate(parsed_events):
+            times = np.asarray(trial_events["states"][self.starting_state], dtype=float)
+            times = times[~np.isnan(times)]
+            if len(times) > 2 or np.any(times > 86400):
+                corrupted.append(trial_index)
+        if not corrupted:
+            return []
+
+        num_completed_trials = int(self.saved["ProtocolsSection_n_completed_trials"])
+        per_trial_lengths = range(num_completed_trials, num_completed_trials + 3)
+        for name, value in self.saved.items():
+            if not isinstance(value, (str, np.ndarray)):
+                continue
+            if re.fullmatch(r"HistorySection_\w+_history", name) and len(value) in per_trial_lengths:
+                if isinstance(value, str):
+                    self.saved[name] = "".join(c for i, c in enumerate(value) if i not in corrupted)
+                else:
+                    self.saved[name] = np.delete(value, corrupted)
+        for name, value in self.saved_history.items():
+            if isinstance(value, list) and len(value) in per_trial_lengths:
+                self.saved_history[name] = [v for i, v in enumerate(value) if i not in corrupted]
+        self.saved["ProtocolsSection_n_completed_trials"] = num_completed_trials - len(corrupted)
+        if "ProtocolsSection_n_started_trials" in self.saved:
+            self.saved["ProtocolsSection_n_started_trials"] -= len(corrupted)
+        warn(f"Dropped trials {corrupted} (0-based) with corrupted '{self.starting_state}' timestamps.")
+        return corrupted
 
     def _get_parsed_events(self, stub_test: bool = False) -> list[dict]:
         """Return the list of per-trial parsed-events dicts from ``saved_history``.
@@ -187,6 +226,11 @@ class BControlBehaviorInterface(BaseDataInterface):
         if isinstance(overall_arr, np.ndarray) and overall_arr.size > 0:
             notes_parts.append(
                 "Overall comments:\n" + "\n".join(s.replace("\x00", "").strip() for s in overall_arr.tolist())
+            )
+        if self.dropped_trial_indices:
+            notes_parts.append(
+                f"Trials {self.dropped_trial_indices} (0-based) of the source file were left out because their "
+                "state machine timestamps are corrupted."
             )
         if notes_parts:
             metadata["NWBFile"]["notes"] = "\n\n".join(notes_parts)
