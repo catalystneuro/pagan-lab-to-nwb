@@ -77,9 +77,14 @@ _INSPECTOR_CRASH_PATTERN = re.compile(
 _STEM_PATTERN = re.compile(r"^(?P<protocol>[^_]+)_(?P<experimenter>[^_]+)_(?P<subject_id>[^_]+)_(?P<date_str>.+)$")
 
 
+# Byte-identical copy of data_@TaskSwitch4_Marino_P100_190409a.mat. The paper's session tables use the
+# TaskSwitch4 copy, so that one is converted.
+_EXCLUDED_FILES = {"data_@TaskSwitch4repeat_Marino_P100_190409a.mat"}
+
+
 def _get_mat_files(data_dir: Path, protocol: str) -> list[Path]:
     """Return sorted list of .mat files for the given protocol."""
-    return sorted(data_dir.rglob(f"data_@{protocol}_*.mat"))
+    return sorted(p for p in data_dir.rglob(f"data_@{protocol}_*.mat") if p.name not in _EXCLUDED_FILES)
 
 
 def _nwb_path_for(mat_file: Path, output_dir: Path) -> Path | None:

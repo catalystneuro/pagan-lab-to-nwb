@@ -120,7 +120,9 @@ def create_events(
             event_times = pokes[event_name]
             if len(event_times) == 0:
                 continue
-            value = pokes["starting_state"].get(event_name, "out")
+            # Each row is one stay in the port, from poke in to poke out. starting_state only says
+            # whether the rat was in the port when the trial began, so it is not the value of a row.
+            value = "in"
             if event_times.shape == (2,):
                 if not np.isnan(event_times[0]):
                     event_rows.append(
@@ -183,7 +185,8 @@ def create_actions(
             action_times = waves[action_name]
             if len(action_times) == 0:
                 continue
-            value = waves["starting_state"].get(action_name, "out")
+            # Each row is one wave, from onset to offset.
+            value = "on"
             if action_times.shape == (2,):
                 if not np.isnan(action_times[0]):
                     action_rows.append(

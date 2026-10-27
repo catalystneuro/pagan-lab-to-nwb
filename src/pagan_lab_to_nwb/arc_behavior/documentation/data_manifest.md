@@ -256,18 +256,20 @@ These become rows in `task.task_arguments` (TaskArgumentsTable):
 
 ### Session-level parameters (`saved`, array types)
 
-The routing depends on array length relative to trial count:
+Only the arguments listed in `PER_TRIAL_ARGUMENTS` (`interfaces/_trials.py`) become trial columns. A scan of all 16,206 source files found 45 arguments whose length tracks the trial count in every session. Every other array or string matches it only by coincidence. Examples are a 14-character `HistorySection_title` in a 14-trial session, or `HistorySection_hit_history_task`, `HistorySection_incoh_history_task` and `HistorySection_hit_history_stage`, which hold the trials of the current block or stage and are one entry short in a session with one block. These go to `task.task_arguments` when they have fewer than 127 entries and are left out otherwise; the per-trial outcomes are in `HistorySection_hit_history` and `HistorySection_result_history`.
+
+For the per-trial arguments, the routing depends on array length relative to trial count:
 
 | Condition | NWB location | Notes |
 |---|---|---|
 | `len == n_completed_trials` | `trials.{argument_name}` column | Per-trial column |
 | `len == n_started_trials` and 1 incomplete | `trials.{argument_name}` column | Last entry trimmed |
 | `len == n_completed_trials + 2` | `trials.{argument_name}` column | Warns, trims 2 extra |
-| `len == n_completed_trials - 1` | `trials.{argument_name}` column | NaN appended |
 | `dtype == object` (inhomogeneous/nested) | `task.task_arguments` | JSON-dumped, expression_type="json" |
 | All-NaN array | Skipped | E.g. `HistorySection_hit_history` is absent when every trial is a violation; `HistorySection_result_history` still gives the outcome |
 | `HistorySection_*_history` read as a scalar | `trials.{argument_name}` column | One-trial sessions: pymatreader returns a scalar, which is wrapped as a length-1 array |
 | `HistorySection_gammadir_history`, `HistorySection_gammafreq_history` | `trials.{argument_name}` column | Cast to float64; some sessions store these signed strengths as uint8 or int16 |
+| `HistorySection_opto_left_history`, `HistorySection_opto_right_history` (TaskSwitch6) | `trials.{argument_name}` column | Per-trial Cerebro power setting, 0 or 800 to 1030; the same values as `OptoSection_opto_left_power` / `OptoSection_opto_right_power` |
 
 ### Per-trial data (`saved_history`)
 
@@ -275,8 +277,8 @@ The routing depends on array length relative to trial count:
 |---|---|---|
 | `ProtocolsSection_parsed_events[i]["states"]` | `task_recording.states` (StatesTable) | All states sorted by start_time |
 | Trial with corrupted `state_0` (more than one interval or a time above one day) | Dropped from every per-trial field | Listed in `NWBFile.notes`; only P189 TaskSwitch6-210516a, trials 26 and 27 |
-| `ProtocolsSection_parsed_events[i]["pokes"]` | `task_recording.events` (EventsTable) | Port pokes, sorted by timestamp |
-| `ProtocolsSection_parsed_events[i]["waves"]` | `task_recording.actions` (ActionsTable) | Sounds/outputs, sorted by timestamp |
+| `ProtocolsSection_parsed_events[i]["pokes"]` | `task_recording.events` (EventsTable) | One row per stay in a port, sorted by timestamp: timestamp = poke in, duration = until poke out, value = "in". `pokes["starting_state"]` (whether the rat was in the port at trial start) is not stored |
+| `ProtocolsSection_parsed_events[i]["waves"]` | `task_recording.actions` (ActionsTable) | One row per sound/output, sorted by timestamp: timestamp = onset, duration = until offset, value = "on" |
 | `StimulusSection_ThisStimulus[i]` scalar params | `trials.*` columns | See stimulus scalar columns above |
 | `StimulusSection_ThisStimulus[i].left_hi` | `trials.left_hi` (ragged) | Relative times in seconds from cpoke onset; add `cpoke_start_time` for absolute |
 | `StimulusSection_ThisStimulus[i].right_hi` | `trials.right_hi` (ragged) | Same |
@@ -412,8 +414,8 @@ One row per completed trial.
 | `gamma_dir` | float64 | Log ratio right/left pulse rates |
 | `gamma_freq` | float64 | Log ratio hi/lo pulse rates |
 | `duration` | float64 | Stimulus duration (seconds) |
-| `freq_lo` | float64 | Low-frequency tone (Hz) |
-| `freq_hi` | float64 | High-frequency tone (Hz) |
+| `freq_lo` | float64 | Frequency (Hz) of the low-frequency pulse columns; equals `freq_hi` in early single-frequency training stages |
+| `freq_hi` | float64 | Frequency (Hz) of the high-frequency pulse columns; equals `freq_lo` in early single-frequency training stages |
 | `vol` | float64 | Overall volume multiplier |
 | `vol_low` | float64 | Low-freq volume multiplier |
 | `vol_hi` | float64 | High-freq volume multiplier |

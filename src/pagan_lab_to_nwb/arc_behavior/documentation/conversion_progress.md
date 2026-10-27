@@ -1,6 +1,6 @@
 # Conversion & Upload Progress — Pagan Lab → DANDI:001550
 
-**Last updated:** 2026-10-22
+**Last updated:** 2026-10-26
 
 ---
 
@@ -17,7 +17,8 @@
 
 **Re-conversion pending (issue #27):** the published files predate the 450 nm wavelength fix and the
 issue #27 fixes. The per-protocol table below gives the counts after re-conversion: P189
-TaskSwitch6-210516a and P013 TaskSwitch3-151113a are added, for 16,117 files and 89 exclusions.
+TaskSwitch6-210516a and P013 TaskSwitch3-151113a are added, and P100 TaskSwitch4repeat-190409a is left
+out as a duplicate, for 16,116 files and 90 exclusions.
 
 **Note:** The nwbinspector crash (IndexError on empty HDF5 datasets — issue #5 in `conversion_issues.md`) affects 8 specific files that are on DANDI, uploaded with `--validation ignore`. These are valid files; the crash is a known nwbinspector 0.7.1 bug.
 
@@ -33,12 +34,12 @@ TaskSwitch6-210516a and P013 TaskSwitch3-151113a are added, for 16,117 files and
 | TaskSwitch3 | 112 | 112 | 0 | P013/151113a previously failed with an older version of the code |
 | TaskSwitch4double | 102 | 96 | 6 | 5 "Ended at" aborts, 1 zero-trial |
 | TaskSwitch4new | 87 | 86 | 1 | "Ended at" abort |
-| TaskSwitch4repeat | 14 | 13 | 1 | "Ended at" abort |
+| TaskSwitch4repeat | 14 | 12 | 2 | 1 "Ended at" abort, 1 duplicate (see below) |
 | ProAnti3Marino | 174 | 173 | 1 | "Ended at" abort |
 | PBups | 75 | 73 | 2 | "Ended at" aborts |
 | ProAnti3 | 16 | 16 | 0 | Complete |
 | TaskSwitch | 19 | 19 | 0 | Complete |
-| **Total** | **16,206** | **16,117** | **89** | |
+| **Total** | **16,206** | **16,116** | **90** | |
 
 ---
 
@@ -53,6 +54,11 @@ TaskSwitch6-210516a and P013 TaskSwitch3-151113a are added, for 16,117 files and
 
 The 4 "fixed" files (H113_190110a, H113_190122b, P007_160220a, P007_161119a) were
 re-converted after the fix was applied and their NWB files exist on disk.
+
+`data_@TaskSwitch4repeat_Marino_P100_190409a.mat` is byte-identical to
+`data_@TaskSwitch4_Marino_P100_190409a.mat`. The paper's session tables use the TaskSwitch4 copy, so
+the TaskSwitch4repeat copy is left out (`_EXCLUDED_FILES` in `convert_and_upload_batched.py`). The
+file's `prot_title` and save path say TaskSwitch4repeat; the NWB file's notes say so.
 
 ---
 
