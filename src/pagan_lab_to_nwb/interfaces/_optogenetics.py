@@ -257,4 +257,7 @@ def add_optogenetic_series_to_nwbfile(
             wavelength_in_nm=stim["wavelength_in_nm"],
             optogenetic_sites=sites,
         )
-    nwbfile.add_time_intervals(epochs_table)
+    # No trial delivered stimulation, e.g. P116 TaskSwitch6-190719b, where every trial is a timeout and
+    # no cpoke happened: leave out the empty table.
+    if len(epochs_table) > 0:
+        nwbfile.add_time_intervals(epochs_table)

@@ -13,11 +13,16 @@ Behavior:
   EventTypesTable:
     description: Contains the name of the events in the task.
   EventsTable:
-    description: Contains the start and stop times of each active event (e.g. poke) in the task.
+    description: >-
+      Contains one row per stay in a nose port: timestamp is the poke in, duration is the time
+      until the poke out, and value is "in". The duration is NaN when the trial ended with the rat
+      in the port.
   ActionTypesTable:
     description: Contains the name of the actions in the task.
   ActionsTable:
-    description: Contains the onset times of the task output actions.
+    description: >-
+      Contains one row per task output (e.g. a sound or a valve opening): timestamp is the onset,
+      duration is the time until the offset, and value is "on".
   TaskArgumentsTable:
     description: Contains the task arguments for the task.
   TrialsTable:
@@ -39,21 +44,29 @@ Behavior:
         (centre-port entry). Add cpoke_start_time to convert to absolute session time.
         Empty when no pulses of this type were generated.
         The column is omitted from a session in which no trial has pulses of this type.
+        The pulses are played at freq_hi Hz; when freq_lo equals freq_hi, the high and low columns
+        do not differ in pitch.
       right_hi: >-
         Times of right-speaker, high-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
         Empty when no pulses of this type were generated.
         The column is omitted from a session in which no trial has pulses of this type.
+        The pulses are played at freq_hi Hz; when freq_lo equals freq_hi, the high and low columns
+        do not differ in pitch.
       left_lo: >-
         Times of left-speaker, low-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
         Empty when no pulses of this type were generated.
         The column is omitted from a session in which no trial has pulses of this type.
+        The pulses are played at freq_lo Hz; when freq_lo equals freq_hi, the high and low columns
+        do not differ in pitch.
       right_lo: >-
         Times of right-speaker, low-frequency pulses in seconds relative to cpoke onset.
         Add cpoke_start_time to convert to absolute session time.
         Empty when no pulses of this type were generated.
         The column is omitted from a session in which no trial has pulses of this type.
+        The pulses are played at freq_lo Hz; when freq_lo equals freq_hi, the high and low columns
+        do not differ in pitch.
     columns:
       - name: crosstalk_dir
         description: The ratio to which the pulse is played from the left or right speaker. A value of 1 means the pulse is played only from the right side, and a value of 0 means the pulse is played equally from both speakers.
@@ -72,13 +85,13 @@ Behavior:
       - name: gamma_dir
         description: Log ratio of average right vs. left pulse rates per second; zero means equal, positive means more pulses come from the right speaker, negative means more left.
       - name: gamma_freq
-        description: Log ratio of average high vs. low frequency pulses per second; zero means equal, positive means more high frequency pulses, negative means more low frequency pulses.
+        description: Log ratio of average high vs. low frequency pulses per second; zero means equal, positive means more high frequency pulses, negative means more low frequency pulses. In trials where freq_lo equals freq_hi (early training stages) all pulses have the same pitch, so this value gives no audible frequency evidence.
       - name: duration
         description: The duration of the sound stimulus in seconds.
       - name: freq_lo
-        description: The frequency of the low frequency pulse in Herz.
+        description: Frequency in Hz of the pulses in the low-frequency columns (left_lo, right_lo). In early training stages it equals freq_hi, and every pulse of the trial is played at this one frequency (the task argument StimulusSection_freq_unique).
       - name: freq_hi
-        description: The frequency of the high frequency pulse in Herz.
+        description: Frequency in Hz of the pulses in the high-frequency columns (left_hi, right_hi). In early training stages it equals freq_lo, and every pulse of the trial is played at this one frequency (the task argument StimulusSection_freq_unique).
 
 # ── Optogenetics ──────────────────────────────────────────────────────────────
 # All optogenetics hardware specs, surgical coordinates, and stimulation parameters.

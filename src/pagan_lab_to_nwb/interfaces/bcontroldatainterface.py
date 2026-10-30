@@ -232,6 +232,16 @@ class BControlBehaviorInterface(BaseDataInterface):
                 f"Trials {self.dropped_trial_indices} (0-based) of the source file were left out because their "
                 "state machine timestamps are corrupted."
             )
+        # The session id takes the protocol from the file name; say so when the file records another one.
+        file_name = Path(self.source_data["file_path"]).name
+        file_protocol = file_name.removeprefix("data_@").split("_")[0]
+        if len(protocol_title_keys) == 1:
+            title_protocol = protocol_title_keys[0].removesuffix("_prot_title")
+            if title_protocol != file_protocol:
+                notes_parts.append(
+                    f"The source file {file_name} records the protocol {title_protocol} in its protocol title. "
+                    f"The session is named after the {file_protocol} in its file name."
+                )
         if notes_parts:
             metadata["NWBFile"]["notes"] = "\n\n".join(notes_parts)
 

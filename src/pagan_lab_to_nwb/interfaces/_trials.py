@@ -8,6 +8,60 @@ import numpy as np
 from ndx_structured_behavior import TrialsTable
 from pynwb.file import NWBFile
 
+# Arguments of `saved` that hold one value per trial. In a scan of all 16,206 source files their length
+# tracks the trial count in every session; every other array or string argument matches it only by
+# coincidence (e.g. a 14-character title in a 14-trial session, or HistorySection_hit_history_task,
+# which holds the outcomes of the current block). Only these become trial columns.
+PER_TRIAL_ARGUMENTS = frozenset(
+    {
+        "AntibiasSection_LocalHitHistory",
+        "AntibiasSection_LocalLocHistory",
+        "AntibiasSection_LocalSidesHistory",
+        "HistorySection_gammadir_history",
+        "HistorySection_gammafreq_history",
+        "HistorySection_hit_history",
+        "HistorySection_hit_history_left",
+        "HistorySection_hit_history_right",
+        "HistorySection_incoh_history",
+        "HistorySection_left_laser_history",
+        "HistorySection_opto_left_history",
+        "HistorySection_opto_right_history",
+        "HistorySection_quadrant_history",
+        "HistorySection_result_history",
+        "HistorySection_right_laser_history",
+        "HistorySection_side_history",
+        "HistorySection_task_history",
+        "HistorySection_violation_history",
+        "MaskSection_mask_history",
+        "PBupsSection_LocalPrevSides",
+        "PBupsSection_LocalPrevSounds",
+        "PBups_hit_history",
+        "PBups_violation_history",
+        "ProAnti3Marino_cpoketry",
+        "ProAnti3Marino_free_history",
+        "ProAnti3Marino_hit_history",
+        "ProAnti3Marino_loc_history",
+        "ProAnti3Marino_mem_history",
+        "ProAnti3Marino_psych_history",
+        "ProAnti3Marino_sides_history",
+        "ProAnti3_cpoketry",
+        "ProAnti3_free_history",
+        "ProAnti3_hit_history",
+        "ProAnti3_loc_history",
+        "ProAnti3_mem_history",
+        "ProAnti3_psych_history",
+        "ProAnti3_sides_history",
+        "ProtocolsSection_stitch_chunks_error_history",
+        "SidesSection_previous_memory_gaps",
+        "SidesSection_previous_rt_task",
+        "SidesSection_previous_samples",
+        "SidesSection_previous_sides",
+        "SidesSection_previous_sounds",
+        "SidesSection_previous_stims",
+        "StimulatorSection_stimulator_history",
+    }
+)
+
 
 def _to_json_serializable(obj):
     """Convert numpy scalars/arrays to JSON-serializable Python types."""
@@ -168,12 +222,13 @@ def add_task_arguments(
             expression_type, output_type = "float", "numeric"
         elif isinstance(argument_value, str):
             expression_type, output_type = "string", "text"
-            if len(argument_value) == num_completed_trials:
-                array_type_arguments[argument_name] = list(argument_value)
-                continue
-            if len(argument_value) == num_started_trials and num_incomplete_trials == 1:
-                array_type_arguments[argument_name] = list(argument_value[:num_completed_trials])
-                continue
+            if argument_name in PER_TRIAL_ARGUMENTS:
+                if len(argument_value) == num_completed_trials:
+                    array_type_arguments[argument_name] = list(argument_value)
+                    continue
+                if len(argument_value) == num_started_trials and num_incomplete_trials == 1:
+                    array_type_arguments[argument_name] = list(argument_value[:num_completed_trials])
+                    continue
         else:
             raise Exception(f"Unknown type '{type(argument_value)}' for argument '{argument_name}'.")
 
@@ -209,34 +264,29 @@ def add_task_arguments(
                 warn(f"Could not JSON-serialize argument '{argument_name}': {e}. Skipping.")
             continue
 
+        is_per_trial = argument_name in PER_TRIAL_ARGUMENTS
         if len(argument_values) and isinstance(argument_values[0], str):
             argument_values = argument_values[:100] if stub_test else argument_values
-            if len(argument_values) == num_completed_trials:
+            if is_per_trial and len(argument_values) == num_completed_trials:
                 trials.add_column(name=argument_name, description=argument_description, data=argument_values)
         elif np.isnan(argument_values).all():
             continue
         else:
             argument_values = argument_values[:100] if stub_test else argument_values
-            if len(argument_values) == num_completed_trials + 2:
+            if is_per_trial and len(argument_values) == num_completed_trials + 2:
                 warn(f"Argument '{argument_name}' has 2 extra entries, removing them.")
                 trials.add_column(
                     name=argument_name,
                     description=argument_description,
                     data=argument_values[:num_completed_trials],
                 )
-            elif len(argument_values) == num_started_trials and num_incomplete_trials == 1:
+            elif is_per_trial and len(argument_values) == num_started_trials and num_incomplete_trials == 1:
                 trials.add_column(
                     name=argument_name,
                     description=argument_description,
                     data=argument_values[:num_completed_trials],
                 )
-            elif len(argument_values) == num_completed_trials - 1:
-                trials.add_column(
-                    name=argument_name,
-                    description=argument_description,
-                    data=np.append(argument_values, np.nan),
-                )
-            elif len(argument_values) == num_completed_trials:
+            elif is_per_trial and len(argument_values) == num_completed_trials:
                 trials.add_column(name=argument_name, description=argument_description, data=argument_values)
             elif len(argument_values) < 127:  # spyglass column-count limit
                 task_arguments.add_row(

@@ -149,6 +149,16 @@ HistorySection:
     description: "Per-trial record of right-hemisphere laser stimulation state. Values:\
       \ 1 = laser was on for this trial (right hemisphere stimulated); 0 = laser\
       \ off. ⚠️ Needs lab confirmation — exact encoding (on/off vs power level) not verified."
+  opto_left_history:
+    description: "Per-trial power setting of the left fibre of the Cerebro wireless laser, in Cerebro's\
+      \ internal units: 0 = laser off on this trial; 800 to 1030 = laser on. The same values as\
+      \ OptoSection_opto_left_power. The stimulation window and the power in mW of each stimulated\
+      \ trial are in intervals/opto_epochs."
+  opto_right_history:
+    description: "Per-trial power setting of the right fibre of the Cerebro wireless laser, in Cerebro's\
+      \ internal units: 0 = laser off on this trial; 800 to 1030 = laser on. The same values as\
+      \ OptoSection_opto_right_power. The stimulation window and the power in mW of each stimulated\
+      \ trial are in intervals/opto_epochs."
 RunningSection:
   RunButton:
     description: Click to Run
@@ -206,6 +216,11 @@ StimulusSection:
     description: low frequency (Hz)
   freq_hi:
     description: high frequency (Hz)
+  freq_unique:
+    description: frequency (Hz) at which every pulse is played in the early training
+      stages that use a single frequency; in those trials freq_lo and freq_hi of the
+      stimulus both equal this value. This is the setting at the end of the session; the
+      value of each trial is in the trials' freq_lo and freq_hi
   vol_low_freq:
     description: volume multiplier for clicks at low frequency
   vol_hi_freq:
